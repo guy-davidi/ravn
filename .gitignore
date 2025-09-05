@@ -1,0 +1,27 @@
+# Build artifacts
+artifacts/
+.cache/
+target/
+*.db
+*.db-journal
+
+# Cargo build artifacts
+**/Cargo.lock
+**/target/
+**/.cargo-lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
