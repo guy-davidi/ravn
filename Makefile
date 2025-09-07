@@ -1,299 +1,103 @@
-# SPDX-License-Identifier: GPL-2.0
-#
-# ravn Makefile
-#
-# This Makefile builds the ravn layered architecture components:
-# - Core Layer: eBPF programs and kernel interfaces
-# - Application Layer: CLI and dashboard interfaces
-#
-# Author: ravn Security Team
-# Date: 2025
+# RAVN Security Platform Makefile
+# Pure C implementation with daemon and CLI modes
 
-# Build configuration
-CC := gcc
-CLANG := clang
-RUSTC := cargo
-CFLAGS := -O2 -g -Wall -Wextra -Werror
-RUSTFLAGS := --release
+# Compiler settings
+CC = gcc
+CFLAGS = -Wall -Wextra -O2 -std=c99 -I$(SRC_DIR)
+LDFLAGS = -lbpf -lhiredis -lpthread -lm
 
-# Directories - All build outputs go to artifacts/
-BUILD_DIR := artifacts/build
-ARTIFACTS_DIR := artifacts
-INCLUDE_DIR := include
-SRC_DIR := src
-LIB_DIR := artifacts/lib
-TOOLS_DIR := tools
-SCRIPTS_DIR := scripts
-DOCS_DIR := docs
+# Directories
+SRC_DIR = src
+BUILD_DIR = artifacts
+ARTIFACTS_DIR = $(BUILD_DIR)
 
-# Layer directories
-CORE_DIR := $(SRC_DIR)/core
-ABSTRACTION_DIR := $(SRC_DIR)/abstraction
-SERVICE_DIR := $(SRC_DIR)/service
-APP_DIR := $(SRC_DIR)/app
-STORAGE_DIR := $(SRC_DIR)/storage
-EBPF_DIR := $(SRC_DIR)/ebpf
-SECURITY_DIR := $(SRC_DIR)/security
+# Source files
+C_SOURCES = $(SRC_DIR)/main.c \
+           $(SRC_DIR)/daemon/ebpf_handler.c \
+           $(SRC_DIR)/daemon/redis_client.c \
+           $(SRC_DIR)/daemon/ai_engine.c
 
-# eBPF programs
-BPF_PROGRAMS := core_execfs core_network core_system core_security core_vulnerability core_update-checker
-BPF_OBJECTS := $(addprefix $(BUILD_DIR)/,$(addsuffix .bpf.o,$(BPF_PROGRAMS)))
+# Targets
+RAVN = $(ARTIFACTS_DIR)/ravn
 
-# Core layer components
-CORE_SOURCES := $(wildcard $(CORE_DIR)/*.c)
-CORE_OBJECTS := $(addprefix $(BUILD_DIR)/core-,$(notdir $(CORE_SOURCES:.c=.o)))
-
-# Abstraction layer components
-ABSTRACTION_SOURCES := $(wildcard $(ABSTRACTION_DIR)/*.c)
-ABSTRACTION_OBJECTS := $(addprefix $(BUILD_DIR)/abstraction-,$(notdir $(ABSTRACTION_SOURCES:.c=.o)))
-
-# Service layer components
-SERVICE_SOURCES := $(wildcard $(SERVICE_DIR)/*.c)
-SERVICE_OBJECTS := $(addprefix $(BUILD_DIR)/service-,$(notdir $(SERVICE_SOURCES:.c=.o)))
-
-# Application layer components
-APP_SOURCES := $(wildcard $(APP_DIR)/*.c)
-APP_OBJECTS := $(addprefix $(BUILD_DIR)/app-,$(notdir $(APP_SOURCES:.c=.o)))
-
-# Storage layer components
-STORAGE_SOURCES := $(wildcard $(STORAGE_DIR)/*.c)
-STORAGE_OBJECTS := $(addprefix $(BUILD_DIR)/storage-,$(notdir $(STORAGE_SOURCES:.c=.o)))
-
-# eBPF layer components
-EBPF_SOURCES := $(wildcard $(EBPF_DIR)/*.c)
-EBPF_OBJECTS := $(addprefix $(BUILD_DIR)/ebpf-,$(notdir $(EBPF_SOURCES:.c=.o)))
-
-# Security layer components
-SECURITY_SOURCES := $(wildcard $(SECURITY_DIR)/*.c)
-SECURITY_OBJECTS := $(addprefix $(BUILD_DIR)/security-,$(notdir $(SECURITY_SOURCES:.c=.o)))
-
-# Libraries
-CORE_LIB := $(LIB_DIR)/libravn-core.a
-ABSTRACTION_LIB := $(LIB_DIR)/libravn-abstraction.a
-SERVICE_LIB := $(LIB_DIR)/libravn-service.a
-STORAGE_LIB := $(LIB_DIR)/libravn-storage.a
-EBPF_LIB := $(LIB_DIR)/libravn-ebpf.a
-SECURITY_LIB := $(LIB_DIR)/libravn-security.a
-
-# Executables
-AGENT := $(ARTIFACTS_DIR)/ravn
-CLI := $(ARTIFACTS_DIR)/ravn-ctl
-
-# Include paths
-INCLUDES := -I$(INCLUDE_DIR) -I$(INCLUDE_DIR)/core -I$(INCLUDE_DIR)/abstraction -I$(INCLUDE_DIR)/service -I$(INCLUDE_DIR)/app -I$(INCLUDE_DIR)/storage -I$(INCLUDE_DIR)/ebpf -I$(INCLUDE_DIR)/security -I$(SRC_DIR)/core/ebpf
-
-# Library paths and libraries
-LIBPATHS := -L$(LIB_DIR)
-LIBS := -lbpf -lelf -lz -lsqlite3 -lm -lpthread
+# eBPF object files
+EBPF_OBJECTS = $(ARTIFACTS_DIR)/syscall_monitor.bpf.o \
+               $(ARTIFACTS_DIR)/network_monitor.bpf.o \
+               $(ARTIFACTS_DIR)/security_monitor.bpf.o \
+               $(ARTIFACTS_DIR)/file_monitor.bpf.o
 
 # Default target
-.PHONY: all
-all: $(AGENT) $(CLI) $(RAVN)
+all: $(RAVN)
 
-# Create directories
-$(BUILD_DIR) $(ARTIFACTS_DIR) $(LIB_DIR):
-	@mkdir -p $@
+# Create artifacts directory
+$(ARTIFACTS_DIR):
+	@mkdir -p $(ARTIFACTS_DIR)
 
-# eBPF program compilation
-$(BUILD_DIR)/%.bpf.o: $(SRC_DIR)/core/ebpf/%.bpf.c | $(BUILD_DIR)
+# Main RAVN binary (eBPF + Redis + AI thread)
+$(RAVN): $(C_SOURCES) | $(ARTIFACTS_DIR)
+	@echo "[RAVN] Building single binary with eBPF monitoring and AI thread"
+	$(CC) $(CFLAGS) -o $(RAVN) $(C_SOURCES) $(LDFLAGS)
+	@echo "[RAVN] Build completed: $(RAVN)"
+
+# eBPF object files
+$(ARTIFACTS_DIR)/%.bpf.o: $(SRC_DIR)/ebpf/%.bpf.c | $(ARTIFACTS_DIR)
 	@echo "[eBPF] Building $@"
-	$(CLANG) -O2 -g -Wall -Wextra -target bpf -c $< -o $@
+	clang -O2 -target bpf -c $< -o $@
 
-# Core layer compilation
-$(BUILD_DIR)/core-%.o: $(CORE_DIR)/%.c | $(BUILD_DIR)
-	@echo "[CORE] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# Abstraction layer compilation
-$(BUILD_DIR)/abstraction-%.o: $(ABSTRACTION_DIR)/%.c | $(BUILD_DIR)
-	@echo "[ABSTRACTION] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# Service layer compilation
-$(BUILD_DIR)/service-%.o: $(SERVICE_DIR)/%.c | $(BUILD_DIR)
-	@echo "[SERVICE] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# Application layer compilation
-$(BUILD_DIR)/app-%.o: $(APP_DIR)/%.c | $(BUILD_DIR)
-	@echo "[APP] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# Storage layer compilation
-$(BUILD_DIR)/storage-%.o: $(STORAGE_DIR)/%.c | $(BUILD_DIR)
-	@echo "[STORAGE] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# eBPF layer compilation
-$(BUILD_DIR)/ebpf-%.o: $(EBPF_DIR)/%.c | $(BUILD_DIR)
-	@echo "[EBPF] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# Security layer compilation
-$(BUILD_DIR)/security-%.o: $(SECURITY_DIR)/%.c | $(BUILD_DIR)
-	@echo "[SECURITY] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# Static libraries
-$(CORE_LIB): $(CORE_OBJECTS) | $(LIB_DIR)
-	@echo "[LIB] Creating $@"
-	ar rcs $@ $^
-
-$(ABSTRACTION_LIB): $(ABSTRACTION_OBJECTS) | $(LIB_DIR)
-	@echo "[LIB] Creating $@"
-	ar rcs $@ $^
-
-$(SERVICE_LIB): $(SERVICE_OBJECTS) | $(LIB_DIR)
-	@echo "[LIB] Creating $@"
-	ar rcs $@ $^
-
-$(STORAGE_LIB): $(STORAGE_OBJECTS) | $(LIB_DIR)
-	@echo "[LIB] Creating $@"
-	ar rcs $@ $^
-
-$(EBPF_LIB): $(EBPF_OBJECTS) | $(LIB_DIR)
-	@echo "[LIB] Creating $@"
-	ar rcs $@ $^
-
-$(SECURITY_LIB): $(SECURITY_OBJECTS) | $(LIB_DIR)
-	@echo "[LIB] Creating $@"
-	ar rcs $@ $^
-
-# Agent executable (integrated with all layers)
-$(AGENT): $(CORE_LIB) $(ABSTRACTION_LIB) $(SERVICE_LIB) $(APP_OBJECTS) $(BPF_OBJECTS) | $(ARTIFACTS_DIR)
-	@echo "[AGENT] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) $(SRC_DIR)/core/core_agent_main.c $(APP_OBJECTS) -o $@ $(LIBPATHS) -lravn-service -lravn-abstraction -lravn-core $(LIBS)
-
-# RAVN cutting-edge eBPF executable (demonstrates CRUD operations)
-RAVN := $(ARTIFACTS_DIR)/ravn
-$(RAVN): $(STORAGE_LIB) $(EBPF_LIB) $(SECURITY_LIB) $(BPF_OBJECTS) | $(ARTIFACTS_DIR)
-	@echo "[RAVN] Building $@"
-	$(CC) $(CFLAGS) $(INCLUDES) $(SRC_DIR)/ravn.c -o $@ $(LIBPATHS) -lravn-storage -lravn-ebpf -lravn-security $(LIBS)
-	@echo "[RAVN] Copying eBPF object files"
-	@cp $(BPF_OBJECTS) $(ARTIFACTS_DIR)/
-
-# CLI executable (Rust)
-$(CLI): $(SRC_DIR)/app/cli/Cargo.toml | $(ARTIFACTS_DIR)
-	@echo "[CLI] Building $@"
-	cd $(SRC_DIR)/app/cli && CARGO_TARGET_DIR=$(CURDIR)/$(BUILD_DIR)/cli CARGO_HOME=$(CURDIR)/$(BUILD_DIR)/cargo-home $(RUSTC) build $(RUSTFLAGS) --features tui
-	@cp $(BUILD_DIR)/cli/release/ravn-ctl $@
-
-# Layer-specific targets
-.PHONY: core
-core: $(CORE_LIB) $(BPF_OBJECTS)
-
-.PHONY: ravn
-ravn: $(RAVN)
-
-.PHONY: abstraction
-abstraction: $(ABSTRACTION_LIB)
-
-.PHONY: service
-service: $(SERVICE_LIB)
-
-.PHONY: app
-app: $(CLI)
-
-.PHONY: agent
-agent: $(AGENT)
-
-.PHONY: cli
-cli: $(CLI)
-
-# Development targets
-.PHONY: debug
-debug: CFLAGS += -DDEBUG -g3
-debug: RUSTFLAGS += --debug
-debug: $(AGENT) $(CLI)
-
-.PHONY: test
-test: $(AGENT) $(CLI)
-	@echo "[TEST] Running tests"
-	@if [ -f scripts/test.sh ]; then ./scripts/test.sh; fi
-
-.PHONY: install
-install: $(AGENT) $(CLI)
-	@echo "[INSTALL] Installing ravn"
-	@sudo cp $(AGENT) /usr/local/bin/
-	@sudo cp $(CLI) /usr/local/bin/
-	@sudo chmod +x /usr/local/bin/ravn
-	@sudo chmod +x /usr/local/bin/ravn-ctl
-
-.PHONY: uninstall
-uninstall:
-	@echo "[UNINSTALL] Removing ravn"
-	@sudo rm -f /usr/local/bin/ravn
-	@sudo rm -f /usr/local/bin/ravn-ctl
-
-# Documentation targets
-.PHONY: docs
-docs:
-	@echo "[DOCS] Generating documentation"
-	@if [ -f scripts/generate-docs.sh ]; then ./scripts/generate-docs.sh; fi
-
-.PHONY: man
-man:
-	@echo "[MAN] Generating man pages"
-	@if [ -f scripts/generate-man.sh ]; then ./scripts/generate-man.sh; fi
-
-# Cleanup targets
-.PHONY: clean
+# Clean build artifacts
 clean:
-	@echo "[CLEAN] Cleaning build artifacts"
-	@rm -rf $(ARTIFACTS_DIR)
-	@rm -rf .cache/
-	@rm -f *.db *.db-journal
+	@echo "[CLEAN] Removing build artifacts"
+	rm -rf $(ARTIFACTS_DIR)
 
-.PHONY: distclean
-distclean: clean
-	@echo "[DISTCLEAN] Cleaning all generated files"
-	@rm -rf .cache/
-	@rm -f *.db *.db-journal
+# Install dependencies
+deps:
+	@echo "[DEPS] Installing system dependencies"
+	sudo apt update
+	sudo apt install -y build-essential clang llvm libbpf-dev libhiredis-dev redis-server
 
-# Help target
-.PHONY: help
+# Start Redis server
+redis:
+	@echo "[REDIS] Starting Redis server"
+	sudo systemctl start redis-server
+
+# Run daemon mode
+daemon: $(RAVN)
+	@echo "[DAEMON] Starting RAVN daemon with AI thread"
+	sudo $(RAVN) daemon
+
+# Run CLI mode
+cli: $(RAVN)
+	@echo "[CLI] Starting RAVN CLI dashboard"
+	$(RAVN) cli
+
+# Test the system
+test: $(RAVN)
+	@echo "[TEST] Testing RAVN system with AI thread"
+	# Start daemon in background
+	sudo $(RAVN) daemon &
+	# Wait a moment for daemon to start
+	sleep 2
+	# Start CLI
+	$(RAVN) cli
+
+# Help
 help:
-	@echo "ravn Build System"
+	@echo "RAVN Security Platform Build System"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all          - Build all components (default)"
-	@echo "  core         - Build core layer (eBPF programs, kernel interfaces)"
-	@echo "  abstraction  - Build abstraction layer (event processing)"
-	@echo "  service      - Build service layer (security services)"
-	@echo "  app          - Build application layer (CLI, dashboard)"
-	@echo "  agent        - Build eBPF agent"
-	@echo "  cli          - Build CLI tool"
-	@echo "  debug        - Build with debug symbols"
-	@echo "  test         - Run tests"
-	@echo "  install      - Install to system"
-	@echo "  uninstall    - Remove from system"
-	@echo "  docs         - Generate documentation"
-	@echo "  man          - Generate man pages"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  distclean    - Clean all generated files"
-	@echo "  help         - Show this help"
+	@echo "  all      - Build complete RAVN system (single binary with AI thread)"
+	@echo "  clean    - Remove all build artifacts"
+	@echo "  deps     - Install system dependencies"
+	@echo "  redis    - Start Redis server"
+	@echo "  daemon   - Run RAVN daemon (eBPF + Redis + AI thread)"
+	@echo "  cli      - Run RAVN CLI dashboard"
+	@echo "  test     - Test complete system (daemon + CLI)"
+	@echo "  help     - Show this help message"
 	@echo ""
-	@echo "Architecture:"
-	@echo "  Core Layer      - eBPF programs, ring buffers, kernel interfaces"
-	@echo "  Abstraction     - Event processing, data structures, interfaces"
-	@echo "  Service Layer   - Security services, anomaly detection, monitoring"
-	@echo "  Application     - CLI, dashboard, configuration management"
-	@echo ""
-	@echo "Directories:"
-	@echo "  $(INCLUDE_DIR)/ - Header files by layer"
-	@echo "  $(SRC_DIR)/     - Source code by layer"
-	@echo "  $(LIB_DIR)/     - Static libraries by layer"
-	@echo "  $(BUILD_DIR)/   - Build artifacts"
-	@echo "  $(ARTIFACTS_DIR)/ - Executable binaries"
+	@echo "Usage:"
+	@echo "  make all     # Build everything (single binary with AI thread)"
+	@echo "  make daemon  # Run daemon: sudo ./artifacts/ravn daemon"
+	@echo "  make cli     # Run CLI: ./artifacts/ravn cli"
+	@echo "  make test    # Test complete system"
 
-# Dependencies
-$(CORE_OBJECTS): $(wildcard $(INCLUDE_DIR)/core/*.h)
-$(ABSTRACTION_OBJECTS): $(wildcard $(INCLUDE_DIR)/abstraction/*.h)
-$(SERVICE_OBJECTS): $(wildcard $(INCLUDE_DIR)/service/*.h)
-$(APP_OBJECTS): $(wildcard $(INCLUDE_DIR)/app/*.h)
-
-# Ensure directories exist before building
-$(CORE_OBJECTS) $(ABSTRACTION_OBJECTS) $(SERVICE_OBJECTS) $(APP_OBJECTS): | $(BUILD_DIR)
-$(BPF_OBJECTS): | $(BUILD_DIR)
-$(CORE_LIB) $(ABSTRACTION_LIB) $(SERVICE_LIB): | $(LIB_DIR)
-$(AGENT) $(CLI): | $(ARTIFACTS_DIR)
+.PHONY: all clean deps redis daemon cli test help
