@@ -73,11 +73,11 @@ static const float all_model_weights[TOTAL_WEIGHT_COUNT] = {{
     header_content += """};
 
 // Layer weight pointers for easy access
-static const float* dense1_weights = &all_model_weights[0];
-static const float* lstm1_weights = &all_model_weights[704];
-static const float* lstm2_weights = &all_model_weights[99520];
-static const float* dense2_weights = &all_model_weights[148928];
-static const float* dense3_weights = &all_model_weights[151008];
+// static const float* dense1_weights = &all_model_weights[0];
+// static const float* lstm1_weights = &all_model_weights[704];
+// static const float* lstm2_weights = &all_model_weights[99520];
+// static const float* dense2_weights = &all_model_weights[148928];
+// static const float* dense3_weights = &all_model_weights[151008];
 
 // Model metadata
 static const char* model_info = "RAVN AI Model - Full LSTM Implementation";
