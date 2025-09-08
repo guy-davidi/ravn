@@ -73,6 +73,7 @@ int redis_is_connected(redis_connection_t *conn) {
     
     // Simple check - just verify context exists and is not in error state
     if (conn->context->err) {
+        snprintf(last_error, sizeof(last_error), "Redis connection error: %s", conn->context->errstr);
         conn->connected = 0;
         return 0;
     }
@@ -106,10 +107,19 @@ int redis_send_event(redis_connection_t *conn, const struct ravn_event *event) {
     }
     escaped_data[j] = '\0';
     
-    snprintf(json_data, sizeof(json_data),
+    int json_len = snprintf(json_data, sizeof(json_data),
         "{\"timestamp\":%lu,\"pid\":%u,\"tid\":%u,\"event_type\":%u,\"event_category\":%u,\"comm\":\"%s\",\"data\":\"%s\"}",
         event->timestamp, event->pid, event->tid, event->event_type, 
         event->event_category, event->comm, escaped_data);
+    
+    // Check if JSON data was truncated
+    if (json_len >= (int)sizeof(json_data)) {
+        snprintf(last_error, sizeof(last_error), "JSON data too large (%d bytes)", json_len);
+        return -1;
+    }
+    
+    // Debug: Log the JSON data being sent
+    LOG_INFO_MODULE("REDIS-CLIENT", "Sending JSON data (%d bytes): %s", json_len, json_data);
     
     // Send to events list
     redisReply *reply = redisCommand(conn->context, "LPUSH events:raw %s", json_data);
@@ -118,11 +128,22 @@ int redis_send_event(redis_connection_t *conn, const struct ravn_event *event) {
         return -1;
     }
     
-    // Accept both integer replies (LPUSH returns list length) and status replies
-    int result = (reply->type == REDIS_REPLY_INTEGER || reply->type == REDIS_REPLY_STATUS) ? 0 : -1;
+    // Debug: Log the reply type and content for troubleshooting
+    LOG_INFO_MODULE("REDIS-CLIENT", "Redis reply type: %d, content: %s", 
+                     reply->type, reply->str ? reply->str : "NULL");
+    
+    // Check for Redis errors first
+    if (reply->type == REDIS_REPLY_ERROR) {
+        snprintf(last_error, sizeof(last_error), "Redis error: %s", reply->str);
+        freeReplyObject(reply);
+        return -1;
+    }
+    
+    // Accept integer replies (LPUSH returns list length), status replies, and simple string replies
+    int result = (reply->type == REDIS_REPLY_INTEGER || reply->type == REDIS_REPLY_STATUS || reply->type == REDIS_REPLY_STRING) ? 0 : -1;
     if (result != 0) {
-        snprintf(last_error, sizeof(last_error), "Redis reply type: %d, expected integer or status", 
-                reply->type);
+        snprintf(last_error, sizeof(last_error), "Redis reply type: %d, expected integer, status, or string. Reply: %s", 
+                reply->type, reply->str ? reply->str : "NULL");
     }
     freeReplyObject(reply);
     
