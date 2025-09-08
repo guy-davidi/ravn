@@ -80,7 +80,7 @@ static const float all_model_weights[TOTAL_WEIGHT_COUNT] = {{
 // static const float* dense3_weights = &all_model_weights[151008];
 
 // Model metadata
-static const char* model_info = "RAVN AI Model - Full LSTM Implementation";
+// static const char* model_info = "RAVN AI Model - Full LSTM Implementation";
 static const int model_version = 2;
 static const int total_parameters = TOTAL_WEIGHT_COUNT;
 
