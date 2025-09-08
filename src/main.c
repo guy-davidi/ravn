@@ -13,6 +13,7 @@
 #include "daemon/ebpf_handler.h"
 #include "daemon/redis_client.h"
 #include "daemon/ai_engine.h"
+#include "utils/logger.h"
 
 // Global variables for cleanup
 static int daemon_running = 0;
@@ -116,18 +117,19 @@ void cleanup_daemon() {
 
 // Daemon mode - main monitoring loop with AI thread
 int run_daemon_mode() {
-    printf("[RAVN] Starting daemon mode (eBPF monitoring + AI thread)...\n");
+    LOG_INFO("Starting daemon mode (eBPF monitoring + AI thread)");
     
     if (init_daemon() != 0) {
+        LOG_ERROR("Failed to initialize daemon");
         return -1;
     }
     
     daemon_running = 1;
     
-    printf("[RAVN] Daemon ready - collecting eBPF events and AI analysis running in background\n");
+    LOG_INFO("Daemon ready - collecting eBPF events and AI analysis running in background");
     
     // Main monitoring loop - collect real events from eBPF
-    printf("[RAVN] Main monitoring loop started - collecting real system events\n");
+    LOG_INFO("Main monitoring loop started - collecting real system events");
     
     while (daemon_running) {
         // The real event collection is now handled by the eBPF monitoring thread
@@ -384,18 +386,33 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    // Initialize logger
+    if (logger_init(LOG_LEVEL_DEBUG, "ravn.log") != 0) {
+        fprintf(stderr, "Failed to initialize logger\n");
+        return 1;
+    }
+    
+    LOG_INFO("RAVN Security Platform starting - Mode: %s", mode);
+    
     // Setup signal handlers
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     
     // Run in appropriate mode
+    int result;
     if (strcmp(mode, "daemon") == 0 || strcmp(mode, "d") == 0) {
-        return run_daemon_mode();
+        result = run_daemon_mode();
     } else if (strcmp(mode, "cli") == 0 || strcmp(mode, "c") == 0) {
-        return run_cli_mode();
+        result = run_cli_mode();
     } else {
-        fprintf(stderr, "[ERROR] Unknown mode: %s\n", mode);
+        LOG_ERROR("Unknown mode: %s", mode);
         print_usage(argv[0]);
-        return 1;
+        result = 1;
     }
+    
+    // Cleanup logger
+    LOG_INFO("RAVN Security Platform shutting down");
+    logger_cleanup();
+    
+    return result;
 }

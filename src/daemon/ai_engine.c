@@ -38,18 +38,20 @@ ai_engine_t* ai_engine_init(const char *model_path) {
         return NULL;
     }
     
+    // Set global pointer before loading model
+    global_ai_engine = engine;
+    
     // Load AI model
     if (ai_load_model(model_path) != 0) {
-        fprintf(stderr, "[AI] Failed to load model, using random weights\n");
-        // Initialize with random weights for demo
-        srand(time(NULL));
-        for (int i = 0; i < 100; i++) {
-            engine->weights[i] = (float)rand() / RAND_MAX * 0.1 - 0.05; // Small random weights
-        }
+        fprintf(stderr, "[AI] Failed to load model from %s\n", model_path);
+        fprintf(stderr, "[AI] AI engine initialization failed - model file required\n");
+        sliding_window_cleanup(&engine->window);
+        global_ai_engine = NULL;
+        free(engine);
+        return NULL;
     }
     
     engine->initialized = 1;
-    global_ai_engine = engine;
     
     printf("[AI] AI engine initialized with model: %s\n", model_path);
     return engine;
@@ -152,6 +154,17 @@ int sliding_window_init(struct sliding_window *window) {
     strcpy(window->threat_reason, "Normal activity");
     
     return 0;
+}
+
+// Cleanup sliding window
+void sliding_window_cleanup(struct sliding_window *window) {
+    if (!window) {
+        return;
+    }
+    
+    // Free any allocated memory if needed
+    // For now, just clear the structure
+    memset(window, 0, sizeof(struct sliding_window));
 }
 
 // Update sliding window
@@ -303,11 +316,25 @@ float ai_calculate_threat_score(struct event_sequence *sequence) {
 // Load AI model
 int ai_load_model(const char *model_path) {
     if (!model_path || !global_ai_engine) {
+        fprintf(stderr, "[AI] Invalid parameters for model loading\n");
         return -1;
     }
     
     FILE *file = fopen(model_path, "rb");
     if (!file) {
+        fprintf(stderr, "[AI] Cannot open model file: %s\n", model_path);
+        return -1;
+    }
+    
+    // Get file size for validation
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    if (file_size < 100 * sizeof(float)) {
+        fprintf(stderr, "[AI] Model file too small: %ld bytes (expected at least %zu bytes)\n", 
+                file_size, 100 * sizeof(float));
+        fclose(file);
         return -1;
     }
     
@@ -316,10 +343,11 @@ int ai_load_model(const char *model_path) {
     fclose(file);
     
     if (read_count != 100) {
+        fprintf(stderr, "[AI] Failed to read model weights: read %zu of 100 floats\n", read_count);
         return -1;
     }
     
-    printf("[AI] Model loaded from %s\n", model_path);
+    printf("[AI] Model loaded successfully from %s (%ld bytes)\n", model_path, file_size);
     return 0;
 }
 

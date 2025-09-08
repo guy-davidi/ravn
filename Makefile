@@ -15,7 +15,8 @@ ARTIFACTS_DIR = $(BUILD_DIR)
 C_SOURCES = $(SRC_DIR)/main.c \
            $(SRC_DIR)/daemon/ebpf_handler.c \
            $(SRC_DIR)/daemon/redis_client.c \
-           $(SRC_DIR)/daemon/ai_engine.c
+           $(SRC_DIR)/daemon/ai_engine.c \
+           $(SRC_DIR)/utils/logger.c
 
 # Targets
 RAVN = $(ARTIFACTS_DIR)/ravn
