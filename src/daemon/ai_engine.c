@@ -1,6 +1,8 @@
 // RAVN AI Engine Implementation
 // Implements AI model loading, sliding window analysis, and threat detection
 
+#define _POSIX_C_SOURCE 200809L
+#define _DEFAULT_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +20,9 @@
 
 // Global AI engine instance
 static ai_engine_t *global_ai_engine = NULL;
+
+// Forward declarations
+void sliding_window_cleanup(struct sliding_window *window);
 
 // Initialize AI engine
 ai_engine_t* ai_engine_init(const char *model_path) {
@@ -162,9 +167,6 @@ int sliding_window_init(struct sliding_window *window) {
     return 0;
 }
 
-// Forward declaration
-void sliding_window_cleanup(struct sliding_window *window);
-
 // Cleanup sliding window
 void sliding_window_cleanup(struct sliding_window *window) {
     if (!window) {
@@ -194,7 +196,7 @@ int sliding_window_update(struct sliding_window *window, uint64_t current_time) 
             
             for (uint32_t j = 0; j < seq->event_count; j++) {
                 if (seq->timestamps[j] >= window->start_time) {
-                    if (keep_count != j) {
+                    if (keep_count != (int)j) {
                         seq->events[keep_count] = seq->events[j];
                         seq->timestamps[keep_count] = seq->timestamps[j];
                     }
@@ -292,7 +294,7 @@ float ai_calculate_threat_score(struct event_sequence *sequence) {
     int unique_types = 0;
     for (uint32_t i = 0; i < sequence->event_count; i++) {
         int is_unique = 1;
-        for (int j = 0; j < i; j++) {
+        for (uint32_t j = 0; j < i; j++) {
             if (sequence->events[i] == sequence->events[j]) {
                 is_unique = 0;
                 break;
@@ -335,7 +337,7 @@ int ai_load_model(const char *model_path) {
     memcpy(global_ai_engine->weights, all_model_weights, sizeof(all_model_weights));
     
     LOG_INFO("Model loaded successfully from compiled weights (%d weights)", TOTAL_WEIGHT_COUNT);
-    LOG_INFO("Model info: %s (version %d)", model_info, model_version);
+    LOG_INFO("Model version: %d", model_version);
     return 0;
 }
 
