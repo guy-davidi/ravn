@@ -66,25 +66,17 @@ void redis_disconnect(redis_connection_t *conn) {
 
 // Check if Redis connection is active
 int redis_is_connected(redis_connection_t *conn) {
-    if (!conn || !conn->context) {
+    if (!conn || !conn->context || !conn->connected) {
         return 0;
     }
     
-    // Test connection with PING
-    redisReply *reply = redisCommand(conn->context, "PING");
-    if (!reply) {
+    // Simple check - just verify context exists and is not in error state
+    if (conn->context->err) {
         conn->connected = 0;
         return 0;
     }
     
-    int connected = (reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
-    freeReplyObject(reply);
-    
-    if (!connected) {
-        conn->connected = 0;
-    }
-    
-    return connected;
+    return 1;
 }
 
 // Send event to Redis
@@ -94,25 +86,47 @@ int redis_send_event(redis_connection_t *conn, const struct ravn_event *event) {
         return -1;
     }
     
-    // Create JSON representation
+    // Create JSON representation with proper escaping
     char json_data[2048];
+    char escaped_data[1024];
+    
+    // Escape quotes in data field
+    int j = 0;
+    for (int i = 0; event->data[i] && j < sizeof(escaped_data) - 1; i++) {
+        if (event->data[i] == '"') {
+            escaped_data[j++] = '\\';
+            escaped_data[j++] = '"';
+        } else if (event->data[i] == '\\') {
+            escaped_data[j++] = '\\';
+            escaped_data[j++] = '\\';
+        } else {
+            escaped_data[j++] = event->data[i];
+        }
+    }
+    escaped_data[j] = '\0';
+    
     snprintf(json_data, sizeof(json_data),
         "{\"timestamp\":%lu,\"pid\":%u,\"tid\":%u,\"event_type\":%u,\"event_category\":%u,\"comm\":\"%s\",\"data\":\"%s\"}",
         event->timestamp, event->pid, event->tid, event->event_type, 
-        event->event_category, event->comm, event->data);
+        event->event_category, event->comm, escaped_data);
     
     // Send to events list
-    redisReply *reply = redisCommand(conn->context, "LPUSH ravn:events %s", json_data);
+    redisReply *reply = redisCommand(conn->context, "LPUSH events:raw %s", json_data);
     if (!reply) {
         snprintf(last_error, sizeof(last_error), "Failed to send event to Redis");
         return -1;
     }
     
-    int result = (reply->type == REDIS_REPLY_INTEGER) ? 0 : -1;
+    // Accept both integer replies (LPUSH returns list length) and status replies
+    int result = (reply->type == REDIS_REPLY_INTEGER || reply->type == REDIS_REPLY_STATUS) ? 0 : -1;
+    if (result != 0) {
+        snprintf(last_error, sizeof(last_error), "Redis reply type: %d, expected integer or status", 
+                reply->type);
+    }
     freeReplyObject(reply);
     
     // Keep only last 1000 events
-    redisCommand(conn->context, "LTRIM ravn:events 0 999");
+    redisCommand(conn->context, "LTRIM events:raw 0 999");
     
     return result;
 }
@@ -125,7 +139,7 @@ int redis_get_event(redis_connection_t *conn, struct ravn_event *event) {
     }
     
     // Get event from events list (blocking with 1 second timeout)
-    redisReply *reply = redisCommand(conn->context, "BRPOP ravn:events 1");
+    redisReply *reply = redisCommand(conn->context, "BRPOP events:raw 1");
     if (!reply || reply->type != REDIS_REPLY_ARRAY || reply->elements < 2) {
         if (reply) freeReplyObject(reply);
         return -1; // No events available
@@ -170,7 +184,7 @@ int redis_update_threat_level(redis_connection_t *conn, const threat_level_t *th
         threat->timestamp, threat->score, threat->level, threat->reason);
     
     // Store current threat level
-    redisReply *reply = redisCommand(conn->context, "SET ravn:threat_level %s", json_data);
+    redisReply *reply = redisCommand(conn->context, "SET threat:current %s", json_data);
     if (!reply) {
         snprintf(last_error, sizeof(last_error), "Failed to update threat level");
         return -1;
@@ -180,7 +194,7 @@ int redis_update_threat_level(redis_connection_t *conn, const threat_level_t *th
     freeReplyObject(reply);
     
     // Publish threat level update
-    redisCommand(conn->context, "PUBLISH ravn:threat_updates %s", json_data);
+    redisCommand(conn->context, "PUBLISH threat:update %s", json_data);
     
     return result;
 }
@@ -192,14 +206,14 @@ int redis_get_threat_level(redis_connection_t *conn, threat_level_t *threat) {
         return -1;
     }
     
-    redisReply *reply = redisCommand(conn->context, "GET ravn:threat_level");
+    redisReply *reply = redisCommand(conn->context, "GET threat:current");
     if (!reply || reply->type != REDIS_REPLY_STRING) {
         if (reply) freeReplyObject(reply);
         snprintf(last_error, sizeof(last_error), "No threat level data available");
         return -1;
     }
     
-    // Parse JSON data
+    // Parse JSON data - handle integer level format
     int parsed = sscanf(reply->str,
         "{\"timestamp\":%lu,\"score\":%f,\"level\":%d,\"reason\":\"%255[^\"]\"}",
         &threat->timestamp, &threat->score, &threat->level, threat->reason);

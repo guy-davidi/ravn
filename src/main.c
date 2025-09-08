@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "daemon/ebpf_handler.h"
 #include "daemon/redis_client.h"
@@ -18,6 +19,9 @@ static redis_connection_t *redis_conn = NULL;
 static ai_engine_t *ai_engine = NULL;
 static pthread_t ai_thread;
 static int ai_thread_running = 0;
+
+// Global Redis connection pointer for eBPF handler
+void* global_redis_conn_ptr = NULL;
 
 // Signal handler for graceful shutdown
 void signal_handler(int sig) {
@@ -57,69 +61,87 @@ void* ai_thread_func(void *arg) {
         }
         
         // Small delay to prevent busy waiting
-        sleep(0); // 10ms - using sleep(0) for now
+        usleep(10000); // 10ms delay
     }
     
     printf("[AI-THREAD] AI analysis thread stopped\n");
     return NULL;
 }
 
-// Initialize daemon components
+// Initialize daemon components in proper layered order
 int init_daemon() {
-    printf("[RAVN] Initializing daemon components...\n");
+    printf("[RAVN] Initializing daemon components in layered architecture...\n");
     
-    // Initialize Redis connection
+    // Layer 1: Initialize eBPF handlers (lowest level - system monitoring)
+    printf("[RAVN] Layer 1: Initializing eBPF system monitoring...\n");
+    if (init_ebpf_handlers() != 0) {
+        fprintf(stderr, "[ERROR] Failed to initialize eBPF handlers\n");
+        return -1;
+    }
+    printf("[RAVN] ✓ eBPF handlers initialized\n");
+    
+    // Layer 2: Initialize Redis database (middle layer - data storage)
+    printf("[RAVN] Layer 2: Initializing Redis database connection...\n");
     redis_conn = redis_connect("127.0.0.1", 6379);
     if (!redis_conn) {
         fprintf(stderr, "[ERROR] Failed to connect to Redis\n");
+        cleanup_ebpf_handlers(); // Cleanup eBPF layer
         return -1;
     }
-    printf("[RAVN] Connected to Redis\n");
+    printf("[RAVN] ✓ Redis database connected\n");
     
-    // Initialize AI engine
+    // Set global Redis connection pointer for eBPF handler
+    global_redis_conn_ptr = redis_conn;
+    printf("[RAVN] ✓ Redis connection linked to eBPF handler\n");
+    
+    // Layer 3: Initialize AI engine (highest level - analysis)
+    printf("[RAVN] Layer 3: Initializing AI analysis engine...\n");
     ai_engine = ai_engine_init("models/ravn_model.bin");
     if (!ai_engine) {
         fprintf(stderr, "[ERROR] Failed to initialize AI engine\n");
-        redis_disconnect(redis_conn);
+        redis_disconnect(redis_conn); // Cleanup Redis layer
+        cleanup_ebpf_handlers();      // Cleanup eBPF layer
         return -1;
     }
-    printf("[RAVN] AI engine initialized\n");
+    printf("[RAVN] ✓ AI engine initialized\n");
     
-    // Initialize eBPF handlers
-    if (init_ebpf_handlers() != 0) {
-        fprintf(stderr, "[ERROR] Failed to initialize eBPF handlers\n");
-        ai_engine_cleanup(ai_engine);
-        redis_disconnect(redis_conn);
-        return -1;
-    }
-    printf("[RAVN] eBPF handlers initialized\n");
-    
+    printf("[RAVN] ✓ All layers initialized successfully\n");
     return 0;
 }
 
-// Cleanup daemon components
+// Cleanup daemon components in reverse layered order
 void cleanup_daemon() {
-    printf("[RAVN] Cleaning up daemon components...\n");
+    printf("[RAVN] Cleaning up daemon components in reverse layered order...\n");
     
-    // Stop AI thread
+    // Layer 3: Cleanup AI engine (highest level first)
+    printf("[RAVN] Layer 3: Cleaning up AI analysis engine...\n");
     if (ai_thread_running) {
         ai_thread_running = 0;
         pthread_join(ai_thread, NULL);
-        printf("[RAVN] AI thread stopped\n");
+        printf("[RAVN] ✓ AI thread stopped\n");
     }
     
     if (ai_engine) {
         ai_engine_cleanup(ai_engine);
         ai_engine = NULL;
+        printf("[RAVN] ✓ AI engine cleaned up\n");
     }
     
+    // Layer 2: Cleanup Redis database (middle layer)
+    printf("[RAVN] Layer 2: Cleaning up Redis database connection...\n");
     if (redis_conn) {
         redis_disconnect(redis_conn);
         redis_conn = NULL;
+        global_redis_conn_ptr = NULL;
+        printf("[RAVN] ✓ Redis database disconnected\n");
     }
     
+    // Layer 1: Cleanup eBPF handlers (lowest level last)
+    printf("[RAVN] Layer 1: Cleaning up eBPF system monitoring...\n");
     cleanup_ebpf_handlers();
-    printf("[RAVN] Cleanup completed\n");
+    printf("[RAVN] ✓ eBPF handlers cleaned up\n");
+    
+    printf("[RAVN] ✓ All layers cleaned up successfully\n");
 }
 
 // Daemon mode - main monitoring loop with AI thread
@@ -142,15 +164,28 @@ int run_daemon_mode() {
     
     printf("[RAVN] Daemon ready - collecting eBPF events and AI analysis running in background\n");
     
-    // Main monitoring loop - collect and store events
+    // Small delay to let AI thread initialize
+    sleep(1);
+    
+    // Main monitoring loop - collect real events from eBPF
+    printf("[RAVN] Main monitoring loop started - collecting real system events\n");
+    
     while (daemon_running) {
-        // In a real implementation, this would:
-        // 1. Collect eBPF events
-        // 2. Convert to ravn_event format
-        // 3. Send to Redis for AI thread to process
+        // The real event collection is now handled by the eBPF monitoring thread
+        // This main loop just keeps the daemon alive and monitors system health
         
-        // For now, just simulate event collection
-        printf("[RAVN] Monitoring system events... (Press Ctrl+C to stop)\n");
+        // Check Redis connection health
+        if (redis_ping(redis_conn) != 0) {
+            printf("[RAVN] Redis connection lost, attempting to reconnect...\n");
+            redis_disconnect(redis_conn);
+            redis_conn = redis_connect("127.0.0.1", 6379);
+            if (!redis_conn) {
+                printf("[RAVN] Failed to reconnect to Redis\n");
+                break;
+            }
+        }
+        
+        // Sleep for a longer interval since real events are handled by eBPF thread
         sleep(5); // Check every 5 seconds
     }
     
@@ -172,19 +207,44 @@ int run_cli_mode() {
     printf("\n=== RAVN Security Dashboard ===\n");
     printf("Press Ctrl+C to exit\n\n");
     
+    int display_counter = 0;
     while (1) {
+        // Clear screen every 10 iterations for better display
+        if (display_counter % 10 == 0) {
+            printf("\033[2J\033[H"); // Clear screen and move cursor to top
+            printf("=== RAVN Security Dashboard ===\n");
+            printf("Press Ctrl+C to exit\n\n");
+        }
+        
         // Get latest threat level
         threat_level_t threat_level;
         if (redis_get_threat_level(redis_conn, &threat_level) == 0) {
             const char *level_str = (threat_level.level == THREAT_HIGH) ? "HIGH" :
                                    (threat_level.level == THREAT_MEDIUM) ? "MEDIUM" : "LOW";
             
-            printf("\r[%ld] Threat Level: %s (Score: %.3f)    ", 
-                   threat_level.timestamp, level_str, threat_level.score);
-            fflush(stdout);
+            // Color coding for threat levels
+            const char *color = (threat_level.level == THREAT_HIGH) ? "\033[31m" : // Red
+                               (threat_level.level == THREAT_MEDIUM) ? "\033[33m" : // Yellow
+                               "\033[32m"; // Green
+            
+            printf("%s[%ld] Threat Level: %s (Score: %.3f)%s\n", 
+                   color, threat_level.timestamp, level_str, threat_level.score, "\033[0m");
+            printf("Reason: %s\n", threat_level.reason);
+        } else {
+            printf("\033[33m[%ld] No threat data available\033[0m\n", time(NULL));
         }
         
-        sleep(1);
+        // Show Redis connection status
+        if (redis_ping(redis_conn) == 0) {
+            printf("\033[32mRedis: Connected\033[0m\n");
+        } else {
+            printf("\033[31mRedis: Disconnected\033[0m\n");
+        }
+        
+        printf("---\n");
+        fflush(stdout);
+        display_counter++;
+        sleep(2);
     }
     
     redis_disconnect(redis_conn);
