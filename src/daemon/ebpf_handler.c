@@ -69,7 +69,7 @@ static void* real_time_monitor(void *arg) {
                                 "{\"cpu_user\":%lu,\"cpu_system\":%lu,\"cpu_idle\":%lu,\"total\":%lu,\"real_data\":true,\"counter\":%d}",
                                 user_diff, system_diff, idle_diff, total_diff, event_counter);
                         
-                        printf("[eBPF] Real CPU activity: user=%lu, system=%lu, idle=%lu, total=%lu\n", 
+                        LOG_INFO_MODULE("eBPF-HANDLER", "Real CPU activity: user=%lu, system=%lu, idle=%lu, total=%lu", 
                                user_diff, system_diff, idle_diff, total_diff);
                         
                         // Send real event to Redis
@@ -116,16 +116,16 @@ static void* real_time_monitor(void *arg) {
                             "{\"load1\":%.2f,\"load5\":%.2f,\"load15\":%.2f,\"running\":%d,\"total\":%d,\"real_data\":true}",
                             load1, load5, load15, running, total);
                     
-                    printf("[eBPF] Real load average: 1min=%.2f, 5min=%.2f, 15min=%.2f, processes=%d/%d\n", 
+                    LOG_INFO_MODULE("eBPF-HANDLER", "Real load average: 1min=%.2f, 5min=%.2f, 15min=%.2f, processes=%d/%d", 
                            load1, load5, load15, running, total);
                     
                     // Send real load event to Redis
                     if (global_redis_conn_ptr) {
                         int result = redis_send_event(global_redis_conn_ptr, &load_event);
                         if (result == 0) {
-                            printf("[eBPF] ✓ Sent real load event to Redis\n");
+                            LOG_INFO_MODULE("eBPF-HANDLER", "✓ Sent real load event to Redis");
                         } else {
-                            printf("[eBPF] ✗ Failed to send load event: %s\n", redis_get_last_error());
+                            LOG_ERROR_MODULE("eBPF-HANDLER", "✗ Failed to send load event: %s", redis_get_last_error());
                         }
                     }
                 }
@@ -162,16 +162,16 @@ static void* real_time_monitor(void *arg) {
                         mem_total, mem_free, mem_available, 
                         ((float)(mem_total - mem_available) / mem_total) * 100.0);
                 
-                printf("[eBPF] Real memory usage: total=%lu kB, free=%lu kB, available=%lu kB\n", 
+                LOG_INFO_MODULE("eBPF-HANDLER", "Real memory usage: total=%lu kB, free=%lu kB, available=%lu kB", 
                        mem_total, mem_free, mem_available);
                 
                 // Send real memory event to Redis
                 if (global_redis_conn_ptr) {
                     int result = redis_send_event(global_redis_conn_ptr, &mem_event);
                     if (result == 0) {
-                        printf("[eBPF] ✓ Sent real memory event to Redis\n");
+                        LOG_INFO_MODULE("eBPF-HANDLER", "✓ Sent real memory event to Redis");
                     } else {
-                        printf("[eBPF] ✗ Failed to send memory event: %s\n", redis_get_last_error());
+                        LOG_ERROR_MODULE("eBPF-HANDLER", "✗ Failed to send memory event: %s", redis_get_last_error());
                     }
                 }
             }
@@ -180,46 +180,46 @@ static void* real_time_monitor(void *arg) {
         sleep(2); // 2 second monitoring interval for real data
     }
     
-    printf("[eBPF] Real-time monitoring stopped\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "Real-time monitoring stopped");
     return NULL;
 }
 
 // Initialize eBPF handlers with real monitoring
 int init_ebpf_handlers(void) {
-    printf("[eBPF] Initializing real eBPF-based system monitoring\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "Initializing real eBPF-based system monitoring");
     monitoring_active = 1;
     
     // Start real-time monitoring thread
     if (pthread_create(&monitoring_thread, NULL, real_time_monitor, NULL) != 0) {
-        printf("[eBPF] Failed to create monitoring thread\n");
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create monitoring thread");
         return -1;
     }
     
-    printf("[eBPF] Real-time system monitoring started\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "Real-time system monitoring started");
     return 0;
 }
 
 // Cleanup eBPF handlers
 void cleanup_ebpf_handlers(void) {
-    printf("[eBPF] Stopping real-time monitoring...\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "Stopping real-time monitoring...");
     monitoring_active = 0;
     
     if (monitoring_thread) {
         pthread_join(monitoring_thread, NULL);
     }
     
-    printf("[eBPF] Real-time monitoring stopped and cleaned up\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "Real-time monitoring stopped and cleaned up");
 }
 
 // Start monitoring (simplified for POC)
 int ebpf_handler_start_monitoring(void) {
-    printf("[eBPF] eBPF monitoring started (simplified mode)\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "eBPF monitoring started (simplified mode)");
     return 0;
 }
 
 // Stop monitoring
 void ebpf_handler_stop_monitoring(void) {
-    printf("[eBPF] eBPF monitoring stopped\n");
+    LOG_INFO_MODULE("eBPF-HANDLER", "eBPF monitoring stopped");
 }
 
 // Process syscall event
@@ -228,7 +228,7 @@ int process_syscall_event(const struct syscall_event *event) {
         return -1;
     }
     
-    printf("[eBPF] Syscall event: PID=%d, Syscall=%s, Ret=%ld\n", 
+    LOG_INFO_MODULE("eBPF-HANDLER", "Syscall event: PID=%d, Syscall=%s, Ret=%ld", 
            event->pid, get_syscall_name(event->syscall_nr), event->ret);
     return 0;
 }
@@ -239,7 +239,7 @@ int process_network_event(const struct network_event *event) {
         return -1;
     }
     
-    printf("[eBPF] Network event: PID=%d, Type=%s, Ret=%ld\n", 
+    LOG_INFO_MODULE("eBPF-HANDLER", "Network event: PID=%d, Type=%s, Ret=%ld", 
            event->pid, get_network_event_name(event->event_type), event->ret);
     return 0;
 }
@@ -250,7 +250,7 @@ int process_security_event(const struct security_event *event) {
         return -1;
     }
     
-    printf("[eBPF] Security event: PID=%d, Type=%s, Ret=%ld\n", 
+    LOG_INFO_MODULE("eBPF-HANDLER", "Security event: PID=%d, Type=%s, Ret=%ld", 
            event->pid, get_security_event_name(event->event_type), event->ret);
     return 0;
 }
@@ -261,7 +261,7 @@ int process_file_event(const struct file_event *event) {
         return -1;
     }
     
-    printf("[eBPF] File event: PID=%d, Type=%s, Ret=%ld\n", 
+    LOG_INFO_MODULE("eBPF-HANDLER", "File event: PID=%d, Type=%s, Ret=%ld", 
            event->pid, get_file_event_name(event->event_type), event->ret);
     return 0;
 }

@@ -26,7 +26,7 @@ void* global_redis_conn_ptr = NULL;
 
 // Signal handler for graceful shutdown
 void signal_handler(int sig) {
-    printf("\n[RAVN] Received signal %d, shutting down gracefully...\n", sig);
+    LOG_INFO_MODULE("MAIN", "Received signal %d, shutting down gracefully...", sig);
     daemon_running = 0;
     // AI thread is managed by AI engine
 }
@@ -35,84 +35,84 @@ void signal_handler(int sig) {
 
 // Initialize daemon components in proper layered order
 int init_daemon() {
-    printf("[RAVN] Initializing daemon components in layered architecture...\n");
+    LOG_INFO_MODULE("MAIN", "Initializing daemon components in layered architecture...");
     
     // Layer 1: Initialize eBPF handlers (lowest level - system monitoring)
-    printf("[RAVN] Layer 1: Initializing eBPF system monitoring...\n");
+    LOG_INFO_MODULE("MAIN", "Layer 1: Initializing eBPF system monitoring...");
     if (init_ebpf_handlers() != 0) {
-        fprintf(stderr, "[ERROR] Failed to initialize eBPF handlers\n");
+        LOG_ERROR_MODULE("MAIN", "Failed to initialize eBPF handlers");
         return -1;
     }
-    printf("[RAVN] ✓ eBPF handlers initialized\n");
+    LOG_INFO_MODULE("MAIN", "✓ eBPF handlers initialized");
     
     // Layer 2: Initialize Redis database (middle layer - data storage)
-    printf("[RAVN] Layer 2: Initializing Redis database connection...\n");
+    LOG_INFO_MODULE("MAIN", "Layer 2: Initializing Redis database connection...");
     redis_conn = redis_connect("127.0.0.1", 6379);
     if (!redis_conn) {
-        fprintf(stderr, "[ERROR] Failed to connect to Redis\n");
+        LOG_ERROR_MODULE("MAIN", "Failed to connect to Redis");
         cleanup_ebpf_handlers(); // Cleanup eBPF layer
         return -1;
     }
-    printf("[RAVN] ✓ Redis database connected\n");
+    LOG_INFO_MODULE("MAIN", "✓ Redis database connected");
     
     // Set global Redis connection pointer for eBPF handler
     global_redis_conn_ptr = redis_conn;
-    printf("[RAVN] ✓ Redis connection linked to eBPF handler\n");
+    LOG_INFO_MODULE("MAIN", "✓ Redis connection linked to eBPF handler");
     
     // Layer 3: Initialize AI engine (highest level - analysis)
-    printf("[RAVN] Layer 3: Initializing AI analysis engine...\n");
+    LOG_INFO_MODULE("MAIN", "Layer 3: Initializing AI analysis engine...");
     ai_engine = ai_engine_init("models/ravn_model.bin");
     if (!ai_engine) {
-        fprintf(stderr, "[ERROR] Failed to initialize AI engine\n");
+        LOG_ERROR_MODULE("MAIN", "Failed to initialize AI engine");
         redis_disconnect(redis_conn); // Cleanup Redis layer
         cleanup_ebpf_handlers();      // Cleanup eBPF layer
         return -1;
     }
-    printf("[RAVN] ✓ AI engine initialized\n");
+    LOG_INFO_MODULE("MAIN", "✓ AI engine initialized");
     
     // Start AI analysis thread as part of initialization
     if (ai_engine_start_thread(ai_engine) != 0) {
-        fprintf(stderr, "[ERROR] Failed to start AI analysis thread\n");
+        LOG_ERROR_MODULE("MAIN", "Failed to start AI analysis thread");
         ai_engine_cleanup(ai_engine);
         redis_disconnect(redis_conn);
         cleanup_ebpf_handlers();
         return -1;
     }
-    printf("[RAVN] ✓ AI analysis thread started\n");
+    LOG_INFO_MODULE("MAIN", "✓ AI analysis thread started");
     
-    printf("[RAVN] ✓ All layers initialized successfully\n");
+    LOG_INFO_MODULE("MAIN", "✓ All layers initialized successfully");
     return 0;
 }
 
 // Cleanup daemon components in reverse layered order
 void cleanup_daemon() {
-    printf("[RAVN] Cleaning up daemon components in reverse layered order...\n");
+    LOG_INFO_MODULE("MAIN", "Cleaning up daemon components in reverse layered order...");
     
     // Layer 3: Cleanup AI engine (highest level first)
-    printf("[RAVN] Layer 3: Cleaning up AI analysis engine...\n");
+    LOG_INFO_MODULE("MAIN", "Layer 3: Cleaning up AI analysis engine...");
     // AI thread is managed by AI engine
     
     if (ai_engine) {
         ai_engine_cleanup(ai_engine);
         ai_engine = NULL;
-        printf("[RAVN] ✓ AI engine cleaned up\n");
+        LOG_INFO_MODULE("MAIN", "✓ AI engine cleaned up");
     }
     
     // Layer 2: Cleanup Redis database (middle layer)
-    printf("[RAVN] Layer 2: Cleaning up Redis database connection...\n");
+    LOG_INFO_MODULE("MAIN", "Layer 2: Cleaning up Redis database connection...");
     if (redis_conn) {
         redis_disconnect(redis_conn);
         redis_conn = NULL;
         global_redis_conn_ptr = NULL;
-        printf("[RAVN] ✓ Redis database disconnected\n");
+        LOG_INFO_MODULE("MAIN", "✓ Redis database disconnected");
     }
     
     // Layer 1: Cleanup eBPF handlers (lowest level last)
-    printf("[RAVN] Layer 1: Cleaning up eBPF system monitoring...\n");
+    LOG_INFO_MODULE("MAIN", "Layer 1: Cleaning up eBPF system monitoring...");
     cleanup_ebpf_handlers();
-    printf("[RAVN] ✓ eBPF handlers cleaned up\n");
+    LOG_INFO_MODULE("MAIN", "✓ eBPF handlers cleaned up");
     
-    printf("[RAVN] ✓ All layers cleaned up successfully\n");
+    LOG_INFO_MODULE("MAIN", "✓ All layers cleaned up successfully");
 }
 
 // Daemon mode - main monitoring loop with AI thread
@@ -137,11 +137,11 @@ int run_daemon_mode() {
         
         // Check Redis connection health
         if (redis_ping(redis_conn) != 0) {
-            printf("[RAVN] Redis connection lost, attempting to reconnect...\n");
+            LOG_INFO_MODULE("MAIN", "Redis connection lost, attempting to reconnect...");
             redis_disconnect(redis_conn);
             redis_conn = redis_connect("127.0.0.1", 6379);
             if (!redis_conn) {
-                printf("[RAVN] Failed to reconnect to Redis\n");
+                LOG_INFO_MODULE("MAIN", "Failed to reconnect to Redis");
                 break;
             }
         }
@@ -156,12 +156,12 @@ int run_daemon_mode() {
 
 // CLI mode - simple dashboard
 int run_cli_mode() {
-    printf("[RAVN] Starting CLI mode...\n");
+    LOG_INFO_MODULE("MAIN", "Starting CLI mode...");
     
     // Connect to Redis to read data
     redis_conn = redis_connect("127.0.0.1", 6379);
     if (!redis_conn) {
-        fprintf(stderr, "[ERROR] Failed to connect to Redis\n");
+        LOG_ERROR_MODULE("MAIN", "Failed to connect to Redis");
         return -1;
     }
     

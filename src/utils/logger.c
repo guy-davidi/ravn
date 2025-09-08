@@ -29,6 +29,11 @@ static __thread char thread_id_str[16] = {0};
 #define COLOR_ERROR   "\033[31m"  // Red
 #define COLOR_FATAL   "\033[35m"  // Magenta
 #define COLOR_BOLD    "\033[1m"
+#define COLOR_MODULE  "\033[94m"  // Blue
+#define COLOR_BRIGHT_BLUE "\033[96m"  // Bright Blue
+#define COLOR_BRIGHT_GREEN "\033[92m"  // Bright Green
+#define COLOR_BRIGHT_RED "\033[91m"    // Bright Red
+#define COLOR_BRIGHT_YELLOW "\033[93m" // Bright Yellow
 
 // Initialize logger
 int logger_init(log_level_t level, const char *log_file) {
@@ -115,10 +120,10 @@ static const char* get_color_code(log_level_t level) {
     }
     
     switch (level) {
-        case LOG_LEVEL_DEBUG: return COLOR_DEBUG;
-        case LOG_LEVEL_INFO:  return COLOR_INFO;
-        case LOG_LEVEL_WARN:  return COLOR_WARN;
-        case LOG_LEVEL_ERROR: return COLOR_ERROR;
+        case LOG_LEVEL_DEBUG: return COLOR_BRIGHT_BLUE;
+        case LOG_LEVEL_INFO:  return COLOR_BRIGHT_GREEN;
+        case LOG_LEVEL_WARN:  return COLOR_BRIGHT_YELLOW;
+        case LOG_LEVEL_ERROR: return COLOR_BRIGHT_RED;
         case LOG_LEVEL_FATAL: return COLOR_FATAL;
         default: return "";
     }
@@ -215,4 +220,79 @@ void logger_cleanup(void) {
     }
     
     g_logger_config.output_file = NULL;
+}
+
+// Module-specific logging function
+void logger_log_with_module(log_level_t level, const char *module, const char *file, int line, const char *func, const char *format, ...) {
+    // Check if we should log this level
+    if (level < g_logger_config.level) {
+        return;
+    }
+    
+    va_list args;
+    char timestamp[32] = {0};
+    char log_buffer[2048] = {0};
+    char *color_start = "";
+    char *color_end = "";
+    char *module_color = "";
+    
+    // Get colors
+    if (g_logger_config.use_colors) {
+        color_start = (char*)get_color_code(level);
+        color_end = COLOR_RESET;
+        module_color = COLOR_MODULE;
+    }
+    
+    // Get timestamp
+    if (g_logger_config.use_timestamps) {
+        get_timestamp(timestamp, sizeof(timestamp));
+    }
+    
+    // Build log message
+    int pos = 0;
+    
+    // Timestamp
+    if (g_logger_config.use_timestamps) {
+        pos += snprintf(log_buffer + pos, sizeof(log_buffer) - pos, "[%s] ", timestamp);
+    }
+    
+    // Thread ID
+    if (g_logger_config.use_thread_id) {
+        pos += snprintf(log_buffer + pos, sizeof(log_buffer) - pos, "[TID:%s] ", thread_id_str);
+    }
+    
+    // Log level with color
+    pos += snprintf(log_buffer + pos, sizeof(log_buffer) - pos, "%s[%s]%s ", 
+                    color_start, logger_level_name(level), color_end);
+    
+    // Module name with color
+    if (module) {
+        pos += snprintf(log_buffer + pos, sizeof(log_buffer) - pos, "%s[%s]%s ", 
+                        module_color, module, color_end);
+    }
+    
+    // File:line:function
+    pos += snprintf(log_buffer + pos, sizeof(log_buffer) - pos, "[%s:%d:%s] ", 
+                    strrchr(file, '/') ? strrchr(file, '/') + 1 : file, line, func);
+    
+    // Format the actual message
+    va_start(args, format);
+    pos += vsnprintf(log_buffer + pos, sizeof(log_buffer) - pos, format, args);
+    va_end(args);
+    
+    // Add newline
+    if (pos < (int)sizeof(log_buffer) - 1) {
+        log_buffer[pos] = '\n';
+        log_buffer[pos + 1] = '\0';
+    }
+    
+    // Write to output
+    fputs(log_buffer, g_logger_config.output_file);
+    fflush(g_logger_config.output_file);
+    
+    // For fatal errors, also write to stderr if not already there
+    if (level == LOG_LEVEL_FATAL && g_logger_config.output_file != stderr) {
+        fputs(log_buffer, stderr);
+        fflush(stderr);
+    }
 }

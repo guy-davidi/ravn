@@ -95,14 +95,14 @@ int ai_engine_start_analysis(ai_engine_t *engine) {
         return -1;
     }
     
-    printf("[AI] AI analysis ready (thread mode)\n");
+    LOG_INFO_MODULE("AI-ENGINE", "AI analysis ready (thread mode)");
     return 0;
 }
 
 // Stop AI analysis (no internal threading - handled by main daemon)
 void ai_engine_stop_analysis(ai_engine_t *engine) {
     (void)engine; // Suppress unused parameter warning
-    printf("[AI] AI analysis stopped\n");
+    LOG_INFO_MODULE("AI-ENGINE", "AI analysis stopped");
 }
 
 // Analyze single event
@@ -409,7 +409,7 @@ void* ai_thread_func(void *arg) {
         return NULL;
     }
     
-    printf("[AI-THREAD] AI analysis thread started\n");
+    LOG_INFO_MODULE("AI-ENGINE", "AI analysis thread started");
     
     // Use the global Redis connection instead of creating new ones
     extern void* global_redis_conn_ptr;
@@ -447,7 +447,7 @@ void* ai_thread_func(void *arg) {
                 
                 redisCommand(redis_conn->context, "SET threat:level \"%s\"", threat_json);
                 
-                printf("[AI-THREAD] Event analyzed: PID=%u, Score=%.3f, Level=%d\n", 
+                LOG_INFO_MODULE("AI-ENGINE", "Event analyzed: PID=%u, Score=%.3f, Level=%d", 
                        event.pid, threat_score, threat_level);
             }
         }
@@ -457,7 +457,7 @@ void* ai_thread_func(void *arg) {
         usleep(500000); // Sleep 0.5 seconds between analysis cycles
     }
     
-    printf("[AI-THREAD] AI analysis thread stopped\n");
+    LOG_INFO_MODULE("AI-ENGINE", "AI analysis thread stopped");
     return NULL;
 }
 
@@ -474,12 +474,12 @@ int ai_engine_start_thread(ai_engine_t *engine) {
     engine->should_stop = 0;
     
     if (pthread_create(&engine->analysis_thread, NULL, ai_thread_func, engine) != 0) {
-        fprintf(stderr, "[AI] Failed to create AI analysis thread\n");
+        LOG_ERROR_MODULE("AI-ENGINE", "Failed to create AI analysis thread");
         return -1;
     }
     
     engine->thread_running = 1;
-    printf("[AI] AI analysis thread started\n");
+    LOG_INFO_MODULE("AI-ENGINE", "AI analysis thread started");
     return 0;
 }
 
@@ -492,9 +492,9 @@ void ai_engine_stop_thread(ai_engine_t *engine) {
     engine->should_stop = 1;
     
     if (pthread_join(engine->analysis_thread, NULL) != 0) {
-        fprintf(stderr, "[AI] Failed to join AI analysis thread\n");
+        LOG_ERROR_MODULE("AI-ENGINE", "Failed to join AI analysis thread");
     }
     
     engine->thread_running = 0;
-    printf("[AI] AI analysis thread stopped\n");
+    LOG_INFO_MODULE("AI-ENGINE", "AI analysis thread stopped");
 }

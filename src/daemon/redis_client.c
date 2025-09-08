@@ -169,7 +169,7 @@ int redis_subscribe_events(redis_connection_t *conn, void (*callback)(const stru
     (void)callback; // Suppress unused parameter warning
     // This would implement Redis pub/sub for real-time events
     // For now, just return success
-    printf("[Redis] Event subscription not implemented yet\n");
+    LOG_INFO_MODULE("REDIS-CLIENT", "Event subscription not implemented yet");
     return 0;
 }
 
@@ -237,7 +237,7 @@ int redis_subscribe_threat_updates(redis_connection_t *conn, void (*callback)(co
     (void)callback; // Suppress unused parameter warning
     // This would implement Redis pub/sub for real-time threat updates
     // For now, just return success
-    printf("[Redis] Threat level subscription not implemented yet\n");
+    LOG_INFO_MODULE("REDIS-CLIENT", "Threat level subscription not implemented yet");
     return 0;
 }
 
