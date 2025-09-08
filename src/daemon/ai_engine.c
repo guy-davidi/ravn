@@ -12,6 +12,7 @@
 #include "ai_engine.h"
 #include "redis_client.h"
 #include "ebpf_handler.h"
+#include "../utils/logger.h"
 
 // Global AI engine instance
 static ai_engine_t *global_ai_engine = NULL;
@@ -20,7 +21,7 @@ static ai_engine_t *global_ai_engine = NULL;
 ai_engine_t* ai_engine_init(const char *model_path) {
     ai_engine_t *engine = malloc(sizeof(ai_engine_t));
     if (!engine) {
-        fprintf(stderr, "[AI] Failed to allocate memory for AI engine\n");
+        LOG_ERROR("Failed to allocate memory for AI engine");
         return NULL;
     }
     
@@ -33,7 +34,7 @@ ai_engine_t* ai_engine_init(const char *model_path) {
     
     // Initialize sliding window
     if (sliding_window_init(&engine->window) != 0) {
-        fprintf(stderr, "[AI] Failed to initialize sliding window\n");
+        LOG_ERROR("Failed to initialize sliding window");
         free(engine);
         return NULL;
     }
@@ -43,8 +44,8 @@ ai_engine_t* ai_engine_init(const char *model_path) {
     
     // Load AI model
     if (ai_load_model(model_path) != 0) {
-        fprintf(stderr, "[AI] Failed to load model from %s\n", model_path);
-        fprintf(stderr, "[AI] AI engine initialization failed - model file required\n");
+        LOG_ERROR("Failed to load model from %s", model_path);
+        LOG_ERROR("AI engine initialization failed - model file required");
         sliding_window_cleanup(&engine->window);
         global_ai_engine = NULL;
         free(engine);
@@ -53,7 +54,7 @@ ai_engine_t* ai_engine_init(const char *model_path) {
     
     engine->initialized = 1;
     
-    printf("[AI] AI engine initialized with model: %s\n", model_path);
+    LOG_INFO("AI engine initialized with model: %s", model_path);
     return engine;
 }
 
@@ -76,7 +77,7 @@ void ai_engine_cleanup(ai_engine_t *engine) {
     }
     
     free(engine);
-    printf("[AI] AI engine cleaned up\n");
+    LOG_INFO("AI engine cleaned up");
 }
 
 // Start AI analysis (no internal threading - handled by main daemon)
@@ -316,13 +317,13 @@ float ai_calculate_threat_score(struct event_sequence *sequence) {
 // Load AI model
 int ai_load_model(const char *model_path) {
     if (!model_path || !global_ai_engine) {
-        fprintf(stderr, "[AI] Invalid parameters for model loading\n");
+        LOG_ERROR("Invalid parameters for model loading");
         return -1;
     }
     
     FILE *file = fopen(model_path, "rb");
     if (!file) {
-        fprintf(stderr, "[AI] Cannot open model file: %s\n", model_path);
+        LOG_ERROR("Cannot open model file: %s", model_path);
         return -1;
     }
     
@@ -332,7 +333,7 @@ int ai_load_model(const char *model_path) {
     fseek(file, 0, SEEK_SET);
     
     if (file_size < 100 * sizeof(float)) {
-        fprintf(stderr, "[AI] Model file too small: %ld bytes (expected at least %zu bytes)\n", 
+        LOG_ERROR("Model file too small: %ld bytes (expected at least %zu bytes)", 
                 file_size, 100 * sizeof(float));
         fclose(file);
         return -1;
@@ -343,11 +344,11 @@ int ai_load_model(const char *model_path) {
     fclose(file);
     
     if (read_count != 100) {
-        fprintf(stderr, "[AI] Failed to read model weights: read %zu of 100 floats\n", read_count);
+        LOG_ERROR("Failed to read model weights: read %zu of 100 floats", read_count);
         return -1;
     }
     
-    printf("[AI] Model loaded successfully from %s (%ld bytes)\n", model_path, file_size);
+    LOG_INFO("Model loaded successfully from %s (%ld bytes)", model_path, file_size);
     return 0;
 }
 

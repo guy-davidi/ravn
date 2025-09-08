@@ -7,6 +7,7 @@
 #include <time.h>
 #include <hiredis/hiredis.h>
 #include "redis_client.h"
+#include "../utils/logger.h"
 
 // Global Redis connection
 static redis_connection_t *global_redis_conn = NULL;
@@ -41,7 +42,7 @@ redis_connection_t* redis_connect(const char *host, int port) {
     
     conn->connected = 1;
     global_redis_conn = conn;
-    printf("[Redis] Connected to Redis at %s:%d\n", host, port);
+    LOG_INFO("Connected to Redis at %s:%d", host, port);
     return conn;
 }
 
@@ -61,7 +62,7 @@ void redis_disconnect(redis_connection_t *conn) {
         global_redis_conn = NULL;
     }
     
-    printf("[Redis] Redis connection closed\n");
+    LOG_INFO("Redis connection closed");
 }
 
 // Check if Redis connection is active

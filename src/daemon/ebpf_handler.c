@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include "ebpf_handler.h"
+#include "../utils/logger.h"
 
 // Global variables for real-time monitoring
 static int monitoring_active = 0;
@@ -27,7 +28,7 @@ char* redis_get_last_error(void);
 
 // Real system monitoring using /proc filesystem
 static void* real_time_monitor(void *arg) {
-    printf("[eBPF] Starting real-time system monitoring\n");
+    LOG_INFO("Starting real-time system monitoring");
     
     static unsigned long last_cpu_user = 0, last_cpu_system = 0, last_cpu_idle = 0;
     static int event_counter = 0;
@@ -74,9 +75,9 @@ static void* real_time_monitor(void *arg) {
                         if (global_redis_conn_ptr) {
                             int result = redis_send_event(global_redis_conn_ptr, &activity_event);
                             if (result == 0) {
-                                printf("[eBPF] ✓ Sent real CPU event to Redis\n");
+                                LOG_DEBUG("Sent real CPU event to Redis");
                             } else {
-                                printf("[eBPF] ✗ Failed to send CPU event: %s\n", redis_get_last_error());
+                                LOG_ERROR("Failed to send CPU event: %s", redis_get_last_error());
                             }
                         }
                         

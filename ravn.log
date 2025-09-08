@@ -1,5 +1,0 @@
-[2025-09-08 22:49:32.703] [32m[INFO][0m [logger.c:46:logger_init] Logger initialized - Level: DEBUG, Output: ravn.log
-[2025-09-08 22:49:32.704] [32m[INFO][0m [main.c:395:main] RAVN Security Platform starting - Mode: daemon
-[2025-09-08 22:49:32.704] [32m[INFO][0m [main.c:120:run_daemon_mode] Starting daemon mode (eBPF monitoring + AI thread)
-[2025-09-08 22:49:32.705] [32m[INFO][0m [main.c:129:run_daemon_mode] Daemon ready - collecting eBPF events and AI analysis running in background
-[2025-09-08 22:49:32.705] [32m[INFO][0m [main.c:132:run_daemon_mode] Main monitoring loop started - collecting real system events
