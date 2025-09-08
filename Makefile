@@ -50,55 +50,9 @@ clean:
 	@echo "[CLEAN] Removing build artifacts"
 	rm -rf $(ARTIFACTS_DIR)
 
-# Install dependencies
-deps:
-	@echo "[DEPS] Installing system dependencies"
-	sudo apt update
-	sudo apt install -y build-essential clang llvm libbpf-dev libhiredis-dev redis-server
-
 # Start Redis server
 redis:
 	@echo "[REDIS] Starting Redis server"
 	sudo systemctl start redis-server
 
-# Run daemon mode
-daemon: $(RAVN)
-	@echo "[DAEMON] Starting RAVN daemon with AI thread"
-	sudo $(RAVN) daemon
-
-# Run CLI mode
-cli: $(RAVN)
-	@echo "[CLI] Starting RAVN CLI dashboard"
-	$(RAVN) cli
-
-# Test the system
-test: $(RAVN)
-	@echo "[TEST] Testing RAVN system with AI thread"
-	# Start daemon in background
-	sudo $(RAVN) daemon &
-	# Wait a moment for daemon to start
-	sleep 2
-	# Start CLI
-	$(RAVN) cli
-
-# Help
-help:
-	@echo "RAVN Security Platform Build System"
-	@echo ""
-	@echo "Targets:"
-	@echo "  all      - Build complete RAVN system (single binary with AI thread)"
-	@echo "  clean    - Remove all build artifacts"
-	@echo "  deps     - Install system dependencies"
-	@echo "  redis    - Start Redis server"
-	@echo "  daemon   - Run RAVN daemon (eBPF + Redis + AI thread)"
-	@echo "  cli      - Run RAVN CLI dashboard"
-	@echo "  test     - Test complete system (daemon + CLI)"
-	@echo "  help     - Show this help message"
-	@echo ""
-	@echo "Usage:"
-	@echo "  make all     # Build everything (single binary with AI thread)"
-	@echo "  make daemon  # Run daemon: sudo ./artifacts/ravn daemon"
-	@echo "  make cli     # Run CLI: ./artifacts/ravn cli"
-	@echo "  make test    # Test complete system"
-
-.PHONY: all clean deps redis daemon cli test help
+.PHONY: all clean redis

@@ -75,7 +75,7 @@ static void* real_time_monitor(void *arg) {
                         if (global_redis_conn_ptr) {
                             int result = redis_send_event(global_redis_conn_ptr, &activity_event);
                             if (result == 0) {
-                                LOG_DEBUG("Sent real CPU event to Redis");
+                                // CPU event sent successfully (no need to log every event)
                             } else {
                                 LOG_ERROR("Failed to send CPU event: %s", redis_get_last_error());
                             }

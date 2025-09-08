@@ -386,8 +386,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    // Initialize logger (output to terminal, no file)
-    if (logger_init(LOG_LEVEL_DEBUG, NULL) != 0) {
+    // Initialize logger (output to terminal, no file, less verbose)
+    if (logger_init(LOG_LEVEL_INFO, NULL) != 0) {
         fprintf(stderr, "Failed to initialize logger\n");
         return 1;
     }
