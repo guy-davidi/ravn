@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <time.h>
+#include <pthread.h>
 
 // Forward declaration
 struct ravn_event;
@@ -49,6 +50,9 @@ struct ai_engine {
     int initialized;
     char model_path[256];
     struct sliding_window window;
+    pthread_t analysis_thread;
+    int thread_running;
+    int should_stop;
 };
 
 // AI engine functions
@@ -57,6 +61,11 @@ void ai_engine_cleanup(ai_engine_t *engine);
 int ai_engine_start_analysis(ai_engine_t *engine);
 void ai_engine_stop_analysis(ai_engine_t *engine);
 float ai_engine_analyze_event(ai_engine_t *engine, const struct ravn_event *event);
+
+// Thread management functions
+int ai_engine_start_thread(ai_engine_t *engine);
+void ai_engine_stop_thread(ai_engine_t *engine);
+void* ai_thread_func(void *arg);
 
 // Sliding window functions
 int sliding_window_init(struct sliding_window *window);

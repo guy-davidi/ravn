@@ -18,8 +18,7 @@
 static int daemon_running = 0;
 static redis_connection_t *redis_conn = NULL;
 static ai_engine_t *ai_engine = NULL;
-static pthread_t ai_thread;
-static int ai_thread_running = 0;
+// AI thread is now managed by the AI engine module
 
 // Global Redis connection pointer for eBPF handler
 void* global_redis_conn_ptr = NULL;
@@ -28,46 +27,10 @@ void* global_redis_conn_ptr = NULL;
 void signal_handler(int sig) {
     printf("\n[RAVN] Received signal %d, shutting down gracefully...\n", sig);
     daemon_running = 0;
-    ai_thread_running = 0;
+    // AI thread is managed by AI engine
 }
 
-// AI thread function
-void* ai_thread_func(void *arg) {
-    printf("[AI-THREAD] AI analysis thread started\n");
-    
-    while (ai_thread_running) {
-        // Get event from Redis
-        struct ravn_event event;
-        if (redis_get_event(redis_conn, &event) == 0) {
-            // Process event with AI engine
-            float threat_score = ai_engine_analyze_event(ai_engine, &event);
-            
-            // Update threat level in Redis
-            threat_level_t threat_level = {
-                .timestamp = event.timestamp,
-                .score = threat_score,
-                .level = (threat_score > 0.7) ? THREAT_HIGH : 
-                        (threat_score > 0.4) ? THREAT_MEDIUM : THREAT_LOW
-            };
-            
-            // Create threat reason
-            snprintf(threat_level.reason, sizeof(threat_level.reason),
-                    "AI analysis: PID=%d, Events=%d, Score=%.3f",
-                    event.pid, ai_engine->window.process_count, threat_score);
-            
-            redis_update_threat_level(redis_conn, &threat_level);
-            
-            printf("[AI-THREAD] Event analyzed: PID=%d, Score=%.3f, Level=%d\n", 
-                   event.pid, threat_score, threat_level.level);
-        }
-        
-        // Small delay to prevent busy waiting
-        usleep(10000); // 10ms delay
-    }
-    
-    printf("[AI-THREAD] AI analysis thread stopped\n");
-    return NULL;
-}
+// AI thread function is now handled by the AI engine module
 
 // Initialize daemon components in proper layered order
 int init_daemon() {
@@ -106,6 +69,16 @@ int init_daemon() {
     }
     printf("[RAVN] ✓ AI engine initialized\n");
     
+    // Start AI analysis thread as part of initialization
+    if (ai_engine_start_thread(ai_engine) != 0) {
+        fprintf(stderr, "[ERROR] Failed to start AI analysis thread\n");
+        ai_engine_cleanup(ai_engine);
+        redis_disconnect(redis_conn);
+        cleanup_ebpf_handlers();
+        return -1;
+    }
+    printf("[RAVN] ✓ AI analysis thread started\n");
+    
     printf("[RAVN] ✓ All layers initialized successfully\n");
     return 0;
 }
@@ -116,11 +89,7 @@ void cleanup_daemon() {
     
     // Layer 3: Cleanup AI engine (highest level first)
     printf("[RAVN] Layer 3: Cleaning up AI analysis engine...\n");
-    if (ai_thread_running) {
-        ai_thread_running = 0;
-        pthread_join(ai_thread, NULL);
-        printf("[RAVN] ✓ AI thread stopped\n");
-    }
+    // AI thread is managed by AI engine
     
     if (ai_engine) {
         ai_engine_cleanup(ai_engine);
@@ -154,19 +123,8 @@ int run_daemon_mode() {
     }
     
     daemon_running = 1;
-    ai_thread_running = 1;
-    
-    // Start AI analysis thread
-    if (pthread_create(&ai_thread, NULL, ai_thread_func, NULL) != 0) {
-        fprintf(stderr, "[ERROR] Failed to create AI thread\n");
-        cleanup_daemon();
-        return -1;
-    }
     
     printf("[RAVN] Daemon ready - collecting eBPF events and AI analysis running in background\n");
-    
-    // Small delay to let AI thread initialize
-    sleep(1);
     
     // Main monitoring loop - collect real events from eBPF
     printf("[RAVN] Main monitoring loop started - collecting real system events\n");
@@ -205,17 +163,21 @@ int run_cli_mode() {
         return -1;
     }
     
-    printf("\n=== RAVN Security Dashboard ===\n");
-    printf("Press Ctrl+C to exit\n\n");
+    // Initialize cutting-edge UI
+    printf("\033[2J\033[H"); // Clear screen
+    printf("\033[1;37m\033[40m"); // White text on black background
     
     int display_counter = 0;
     while (1) {
-        // Clear screen every 10 iterations for better display
-        if (display_counter % 10 == 0) {
-            printf("\033[2J\033[H"); // Clear screen and move cursor to top
-            printf("=== RAVN Security Dashboard ===\n");
-            printf("Press Ctrl+C to exit\n\n");
-        }
+        // Clear screen and set up professional layout
+        printf("\033[2J\033[H"); // Clear screen and move cursor to top
+        
+        // Professional header with gradient effect
+        printf("\033[1;37m\033[40m");
+        printf("╔══════════════════════════════════════════════════════════════════════════════╗\n");
+        printf("║\033[1;36m                           RAVN SECURITY PLATFORM v2.0\033[1;37m                           ║\n");
+        printf("║\033[1;33m                        Real-time Threat Detection & Analysis\033[1;37m                      ║\n");
+        printf("╚══════════════════════════════════════════════════════════════════════════════╝\n");
         
         // Get current time for display
         time_t current_time = time(NULL);
@@ -223,88 +185,139 @@ int run_cli_mode() {
         char time_str[64];
         strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
         
-        // Header with timestamp
-        printf("\033[1;36m[%s] RAVN Security Status\033[0m\n", time_str);
-        printf("═══════════════════════════════════════════════════════════════\n");
+        // Status bar
+        printf("\033[1;37m┌─ STATUS ─────────────────────────────────────────────────────────────────────────┐\n");
+        printf("│ \033[1;32m● LIVE\033[1;37m │ \033[1;36m%s\033[1;37m │ \033[1;33mPress Ctrl+C to exit\033[1;37m │\n", time_str);
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+        
+        // Main dashboard grid
+        printf("\033[1;37m┌─ THREAT ASSESSMENT ─────────────────────────────────────────────────────────────┐\n");
         
         // Get latest threat level
         threat_level_t threat_level;
         if (redis_get_threat_level(redis_conn, &threat_level) == 0) {
-            const char *level_str = (threat_level.level == THREAT_HIGH) ? "HIGH" :
-                                   (threat_level.level == THREAT_MEDIUM) ? "MEDIUM" : "LOW";
+            const char *level_str = (threat_level.level == THREAT_HIGH) ? "CRITICAL" :
+                                   (threat_level.level == THREAT_MEDIUM) ? "ELEVATED" : "NORMAL";
             
-            // Color coding for threat levels
-            const char *color = (threat_level.level == THREAT_HIGH) ? "\033[1;31m" : // Bright Red
-                               (threat_level.level == THREAT_MEDIUM) ? "\033[1;33m" : // Bright Yellow
-                               "\033[1;32m"; // Bright Green
+            // Professional color coding
+            const char *color = (threat_level.level == THREAT_HIGH) ? "\033[1;31m" : // Red
+                               (threat_level.level == THREAT_MEDIUM) ? "\033[1;33m" : // Yellow
+                               "\033[1;32m"; // Green
             
-            printf("🚨 \033[1mThreat Level:\033[0m %s%s%s (Score: %.3f)\n", 
-                   color, level_str, "\033[0m", threat_level.score);
-            printf("📋 \033[1mReason:\033[0m %s\n", threat_level.reason);
+            // Threat level with progress bar
+            printf("│ \033[1;37mThreat Level: \033[0m%s%s\033[1;37m │ Score: \033[1;36m%.3f\033[1;37m │ ", 
+                   color, level_str, threat_level.score);
+            
+            // Progress bar for threat score
+            int bar_length = 20;
+            int filled = (int)(threat_level.score * bar_length);
+            printf("[\033[1;32m");
+            for (int i = 0; i < filled; i++) printf("█");
+            printf("\033[1;30m");
+            for (int i = filled; i < bar_length; i++) printf("░");
+            printf("\033[1;37m] │\n");
+            
+            // Threat reason
+            printf("│ \033[1;37mAnalysis: \033[1;33m%s\033[1;37m │\n", threat_level.reason);
         } else {
-            printf("🚨 \033[1mThreat Level:\033[0m \033[33mNo data available\033[0m\n");
+            printf("│ \033[1;37mThreat Level: \033[1;30mNO DATA\033[1;37m │ Score: \033[1;30mN/A\033[1;37m │ [\033[1;30m░░░░░░░░░░░░░░░░░░░░\033[1;37m] │\n");
+            printf("│ \033[1;37mAnalysis: \033[1;30mWaiting for data...\033[1;37m │\n");
         }
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
         
-        // Show Redis connection status
-        printf("🔗 \033[1mRedis Status:\033[0m ");
+        // System Status Grid
+        printf("\033[1;37m┌─ SYSTEM STATUS ────────────────────────────────────────────────────────────────┐\n");
+        
+        // Redis connection status
+        printf("│ \033[1;37mRedis: \033[0m");
         if (redis_ping(redis_conn) == 0) {
-            printf("\033[32mConnected ✓\033[0m\n");
+            printf("\033[1;32m● CONNECTED\033[1;37m │ ");
         } else {
-            printf("\033[31mDisconnected ✗\033[0m\n");
+            printf("\033[1;31m● DISCONNECTED\033[1;37m │ ");
         }
         
-        // Show eBPF program status
-        printf("🔍 \033[1meBPF Programs:\033[0m ");
-        printf("\033[32mActive ✓\033[0m (CPU, Memory, Load, System monitoring)\n");
+        // eBPF status
+        printf("\033[1;37meBPF: \033[1;32m● ACTIVE\033[1;37m │ ");
         
-        // Show system metrics from Redis
-        printf("📊 \033[1mSystem Metrics:\033[0m\n");
+        // AI status
+        printf("\033[1;37mAI: \033[1;32m● ANALYZING\033[1;37m │\n");
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+        
+        // Metrics Dashboard
+        printf("\033[1;37m┌─ METRICS DASHBOARD ──────────────────────────────────────────────────────────┐\n");
         
         // Get event count from Redis
         redisReply *reply = redisCommand(redis_conn->context, "LLEN events:raw");
+        long long event_count = 0;
         if (reply && reply->type == REDIS_REPLY_INTEGER) {
-            printf("   • Events collected: \033[36m%lld\033[0m\n", reply->integer);
+            event_count = reply->integer;
         }
         if (reply) freeReplyObject(reply);
         
-        // Get latest events for system metrics display
-        reply = redisCommand(redis_conn->context, "LRANGE events:raw 0 2");
-        if (reply && reply->type == REDIS_REPLY_ARRAY) {
-            for (size_t i = 0; i < reply->elements && i < 3; i++) {
-                if (reply->element[i]->type == REDIS_REPLY_STRING) {
-                    // Parse event type from JSON (simplified)
-                    char *data = reply->element[i]->str;
-                    if (strstr(data, "\"event_type\":1")) {
-                        printf("   • CPU monitoring: \033[32mActive\033[0m\n");
-                    } else if (strstr(data, "\"event_type\":2")) {
-                        printf("   • Load monitoring: \033[32mActive\033[0m\n");
-                    } else if (strstr(data, "\"event_type\":3")) {
-                        printf("   • Memory monitoring: \033[32mActive\033[0m\n");
-                    }
-                }
-            }
-        }
-        if (reply) freeReplyObject(reply);
+        // Event counter with animation
+        printf("│ \033[1;37mEvents: \033[1;36m%lld\033[1;37m │ ", event_count);
         
-        // Show thread status
-        printf("🧵 \033[1mThread Status:\033[0m\n");
-        printf("   • eBPF monitoring: \033[32mRunning\033[0m\n");
-        printf("   • AI analysis: \033[32mRunning\033[0m\n");
-        printf("   • Main loop: \033[32mActive\033[0m\n");
-        
-        // Show system uptime
+        // System uptime
         FILE *uptime_file = fopen("/proc/uptime", "r");
         if (uptime_file) {
             double uptime;
             if (fscanf(uptime_file, "%lf", &uptime) == 1) {
                 int hours = (int)(uptime / 3600);
                 int minutes = (int)((uptime - hours * 3600) / 60);
-                printf("⏱️  \033[1mSystem Uptime:\033[0m %dh %dm\n", hours, minutes);
+                printf("\033[1;37mUptime: \033[1;33m%02dh %02dm\033[1;37m │ ", hours, minutes);
             }
             fclose(uptime_file);
         }
         
-        printf("═══════════════════════════════════════════════════════════════\n");
+        // Memory usage
+        FILE *mem_file = fopen("/proc/meminfo", "r");
+        if (mem_file) {
+            char line[256];
+            long total_mem = 0, free_mem = 0;
+            while (fgets(line, sizeof(line), mem_file)) {
+                if (sscanf(line, "MemTotal: %ld kB", &total_mem) == 1) continue;
+                if (sscanf(line, "MemAvailable: %ld kB", &free_mem) == 1) break;
+            }
+            fclose(mem_file);
+            if (total_mem > 0) {
+                float mem_usage = ((float)(total_mem - free_mem) / total_mem) * 100.0;
+                printf("\033[1;37mMemory: \033[1;35m%.1f%%\033[1;37m │\n", mem_usage);
+            }
+        }
+        
+        // Monitoring programs status
+        printf("│ \033[1;37mCPU Monitor: \033[1;32m●\033[1;37m │ Load Monitor: \033[1;32m●\033[1;37m │ Memory Monitor: \033[1;32m●\033[1;37m │ System Monitor: \033[1;32m●\033[1;37m │\n");
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+        
+        // Real-time activity feed
+        printf("\033[1;37m┌─ ACTIVITY FEED ───────────────────────────────────────────────────────────────┐\n");
+        
+        // Get latest events for activity display
+        reply = redisCommand(redis_conn->context, "LRANGE events:raw 0 4");
+        if (reply && reply->type == REDIS_REPLY_ARRAY) {
+            for (size_t i = 0; i < reply->elements && i < 3; i++) {
+                if (reply->element[i]->type == REDIS_REPLY_STRING) {
+                    char *data = reply->element[i]->str;
+                    if (strstr(data, "\"event_type\":1")) {
+                        printf("│ \033[1;37m[CPU] \033[1;36mSystem activity detected\033[1;37m │ \033[1;30m%s\033[1;37m │\n", time_str);
+                    } else if (strstr(data, "\"event_type\":2")) {
+                        printf("│ \033[1;37m[LOAD] \033[1;33mLoad average updated\033[1;37m │ \033[1;30m%s\033[1;37m │\n", time_str);
+                    } else if (strstr(data, "\"event_type\":3")) {
+                        printf("│ \033[1;37m[MEM] \033[1;35mMemory usage tracked\033[1;37m │ \033[1;30m%s\033[1;37m │\n", time_str);
+                    }
+                }
+            }
+        }
+        if (reply) freeReplyObject(reply);
+        
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+        
+        // Footer
+        printf("\033[1;37m┌─ RAVN v2.0 ──────────────────────────────────────────────────────────────────┐\n");
+        printf("│ \033[1;30mReal-time eBPF monitoring │ AI-powered threat detection │ Professional SOC\033[1;37m │\n");
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+        
+        printf("\033[0m"); // Reset colors
         fflush(stdout);
         display_counter++;
         sleep(2);

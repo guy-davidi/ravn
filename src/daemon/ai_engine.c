@@ -6,6 +6,9 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <hiredis/hiredis.h>
 #include "ai_engine.h"
 #include "redis_client.h"
 #include "ebpf_handler.h"
@@ -25,6 +28,8 @@ ai_engine_t* ai_engine_init(const char *model_path) {
     memset(engine, 0, sizeof(ai_engine_t));
     strncpy(engine->model_path, model_path, sizeof(engine->model_path) - 1);
     engine->model_path[sizeof(engine->model_path) - 1] = '\0';
+    engine->thread_running = 0;
+    engine->should_stop = 0;
     
     // Initialize sliding window
     if (sliding_window_init(&engine->window) != 0) {
@@ -57,7 +62,7 @@ void ai_engine_cleanup(ai_engine_t *engine) {
     }
     
     // Stop analysis thread
-    ai_engine_stop_analysis(engine);
+    ai_engine_stop_thread(engine);
     
     // Cleanup sliding window
     memset(&engine->window, 0, sizeof(engine->window));
@@ -406,4 +411,101 @@ int ai_detect_attack_pattern(const struct event_sequence *sequence) {
     }
     
     return 0;
+}
+
+// AI thread function - runs continuously to analyze events
+void* ai_thread_func(void *arg) {
+    ai_engine_t *engine = (ai_engine_t*)arg;
+    if (!engine) {
+        return NULL;
+    }
+    
+    printf("[AI-THREAD] AI analysis thread started\n");
+    
+    // Use the global Redis connection instead of creating new ones
+    extern void* global_redis_conn_ptr;
+    redis_connection_t *redis_conn = (redis_connection_t*)global_redis_conn_ptr;
+    
+    while (!engine->should_stop) {
+        // Check if Redis connection is available
+        if (!redis_conn || redis_ping(redis_conn) != 0) {
+            usleep(1000000); // Sleep 1 second if Redis not available
+            continue;
+        }
+        
+        // Get latest event from Redis
+        redisReply *reply = redisCommand(redis_conn->context, "RPOP events:raw");
+        if (reply && reply->type == REDIS_REPLY_STRING) {
+            // Parse event JSON (simplified)
+            struct ravn_event event;
+            memset(&event, 0, sizeof(event));
+            
+            // Simple JSON parsing for demo
+            if (sscanf(reply->str, "{\"pid\":%u,\"event_type\":%u,\"timestamp\":%lu", 
+                      &event.pid, &event.event_type, &event.timestamp) == 3) {
+                
+                // Analyze the event
+                float threat_score = ai_engine_analyze_event(engine, &event);
+                
+                // Determine threat level
+                int threat_level = (threat_score > 0.7) ? 2 : (threat_score > 0.4) ? 1 : 0;
+                
+                // Update threat level in Redis
+                char threat_json[512];
+                snprintf(threat_json, sizeof(threat_json),
+                        "{\"level\":%d,\"score\":%.3f,\"reason\":\"AI analysis: PID %u\",\"timestamp\":%lu}",
+                        threat_level, threat_score, event.pid, time(NULL));
+                
+                redisCommand(redis_conn->context, "SET threat:level \"%s\"", threat_json);
+                
+                printf("[AI-THREAD] Event analyzed: PID=%u, Score=%.3f, Level=%d\n", 
+                       event.pid, threat_score, threat_level);
+            }
+        }
+        
+        if (reply) freeReplyObject(reply);
+        
+        usleep(500000); // Sleep 0.5 seconds between analysis cycles
+    }
+    
+    printf("[AI-THREAD] AI analysis thread stopped\n");
+    return NULL;
+}
+
+// Start AI analysis thread
+int ai_engine_start_thread(ai_engine_t *engine) {
+    if (!engine || !engine->initialized) {
+        return -1;
+    }
+    
+    if (engine->thread_running) {
+        return 0; // Already running
+    }
+    
+    engine->should_stop = 0;
+    
+    if (pthread_create(&engine->analysis_thread, NULL, ai_thread_func, engine) != 0) {
+        fprintf(stderr, "[AI] Failed to create AI analysis thread\n");
+        return -1;
+    }
+    
+    engine->thread_running = 1;
+    printf("[AI] AI analysis thread started\n");
+    return 0;
+}
+
+// Stop AI analysis thread
+void ai_engine_stop_thread(ai_engine_t *engine) {
+    if (!engine || !engine->thread_running) {
+        return;
+    }
+    
+    engine->should_stop = 1;
+    
+    if (pthread_join(engine->analysis_thread, NULL) != 0) {
+        fprintf(stderr, "[AI] Failed to join AI analysis thread\n");
+    }
+    
+    engine->thread_running = 0;
+    printf("[AI] AI analysis thread stopped\n");
 }
