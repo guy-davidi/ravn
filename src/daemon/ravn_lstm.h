@@ -1,14 +1,11 @@
 // RAVN RNN+LSTM Wrapper
-// Integrates sieknet RNN and LSTM for sequence-based threat detection
+// Simplified implementation without external dependencies
 
 #ifndef RAVN_RNN_LSTM_H
 #define RAVN_RNN_LSTM_H
 
 #include <stdint.h>
 #include <stddef.h>
-#include "sieknet/include/rnn.h"
-#include "sieknet/include/lstm.h"
-#include "sieknet/include/mlp.h"
 
 // RAVN RNN+LSTM Configuration
 #define RAVN_SEQUENCE_LENGTH 20    // 20 events per sequence
@@ -19,9 +16,6 @@
 
 // RAVN RNN+LSTM Model Structure
 typedef struct {
-    rnn *rnn_network;              // sieknet RNN network (first layer)
-    lstm_layer_t *lstm_layer;      // sieknet LSTM layer (second layer)
-    mlp_layer_t *dense_layer;      // Output dense layer
     float *input_buffer;           // Input sequence buffer
     float *rnn_output_buffer;      // RNN output buffer
     float *lstm_output_buffer;     // LSTM output buffer

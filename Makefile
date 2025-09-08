@@ -3,7 +3,7 @@
 
 # Compiler settings
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -std=c99 -I$(SRC_DIR) -I$(SRC_DIR)/daemon/sieknet/include
+CFLAGS = -Wall -Wextra -O2 -std=c99 -I$(SRC_DIR)
 LDFLAGS = -lbpf -lhiredis -lpthread -lm
 
 # Directories
@@ -17,14 +17,11 @@ C_SOURCES = $(SRC_DIR)/main.c \
            $(SRC_DIR)/daemon/redis_client.c \
            $(SRC_DIR)/daemon/ai_engine.c \
            $(SRC_DIR)/daemon/ravn_rnn_lstm.c \
-           $(SRC_DIR)/daemon/sieknet/src/rnn.c \
-           $(SRC_DIR)/daemon/sieknet/src/lstm.c \
-           $(SRC_DIR)/daemon/sieknet/src/mlp.c \
            $(SRC_DIR)/utils/logger.c
 
 # Targets
 RAVN = $(ARTIFACTS_DIR)/ravn
-MODEL_HEADER = $(SRC_DIR)/daemon/model_weights.h
+MODEL_HEADER = $(SRC_DIR)/daemon/codegen/model_weights.h
 
 # eBPF object files
 EBPF_OBJECTS = $(ARTIFACTS_DIR)/syscall_monitor.bpf.o \

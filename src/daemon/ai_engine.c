@@ -13,7 +13,7 @@
 #include "redis_client.h"
 #include "ebpf_handler.h"
 #include "../utils/logger.h"
-#include "model_weights.h"  // Generated model weights
+#include "codegen/model_weights.h"  // Generated model weights
 
 // Global AI engine instance
 static ai_engine_t *global_ai_engine = NULL;

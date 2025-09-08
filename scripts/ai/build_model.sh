@@ -20,12 +20,12 @@ echo "✅ Training data generated"
 
 # Step 2: Train model
 echo "🧠 Step 2: Training AI model..."
-python3 train_model.py --data training_data.json --output ravn_model.h5 --epochs 50
+python3 train_model.py --data training_data.json --output ../../artifacts/ravn_model.h5 --epochs 50
 echo "✅ Model trained"
 
 # Step 3: Generate C header
 echo "🔧 Step 3: Generating C code..."
-python3 generate_c_model.py --weights ravn_model.h5_weights.bin --output ../../src/daemon/model_weights.h
+python3 generate_c_model.py --weights ../../artifacts/ravn_model.h5_weights.bin --output ../../src/daemon/codegen/model_weights.h
 echo "✅ C header generated"
 
 # Step 4: Clean up intermediate files (optional)
@@ -37,9 +37,9 @@ echo ""
 echo "🎉 Build completed successfully!"
 echo ""
 echo "📁 Generated files:"
-echo "   - src/daemon/model_weights.h (C header with weights)"
-echo "   - scripts/ai/best_model.h5 (TensorFlow model)"
-echo "   - scripts/ai/training_history.png (training chart)"
+echo "   - src/daemon/codegen/model_weights.h (C header with weights)"
+echo "   - artifacts/ravn_model.h5 (TensorFlow model)"
+echo "   - artifacts/training_history.png (training chart)"
 echo ""
 echo "🔨 Next steps:"
 echo "   1. Update src/daemon/ai_engine.c to use model_weights.h"

@@ -173,7 +173,7 @@ class RAVNModelTrainer:
         # Callbacks
         callbacks = [
             EarlyStopping(patience=10, restore_best_weights=True),
-            ModelCheckpoint('best_model.h5', save_best_only=True)
+            ModelCheckpoint('../../artifacts/best_model.h5', save_best_only=True)
         ]
         
         # Train model
@@ -229,7 +229,7 @@ class RAVNModelTrainer:
         ax2.legend()
         
         plt.tight_layout()
-        plt.savefig('training_history.png')
+        plt.savefig('../../artifacts/training_history.png')
         plt.show()
     
     def save_model(self, model_path: str):
