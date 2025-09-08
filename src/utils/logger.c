@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
+#include <stdarg.h>
 
 // Global logger configuration
 static logger_config_t g_logger_config = {
@@ -183,7 +186,7 @@ void logger_log(log_level_t level, const char *file, int line, const char *func,
     va_end(args);
     
     // Add newline
-    if (pos < sizeof(log_buffer) - 1) {
+    if (pos < (int)sizeof(log_buffer) - 1) {
         log_buffer[pos] = '\n';
         log_buffer[pos + 1] = '\0';
     }

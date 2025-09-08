@@ -433,6 +433,7 @@ int ravn_model_predict_class(ravn_model_t *model, const float *sequence, size_t 
     }
     
     float threat_score = ravn_model_predict(model, sequence, sequence_length);
+    (void)threat_score; // Suppress unused variable warning
     
     // Convert probabilities to class
     if (model->final_output[0] > model->final_output[1] && model->final_output[0] > model->final_output[2]) {
@@ -451,5 +452,4 @@ const char* ravn_model_class_name(int class_id) {
         case 2: return "Attack";
         default: return "Unknown";
     }
-}
 }

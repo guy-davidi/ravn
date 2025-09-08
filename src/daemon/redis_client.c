@@ -93,7 +93,7 @@ int redis_send_event(redis_connection_t *conn, const struct ravn_event *event) {
     
     // Escape quotes in data field
     int j = 0;
-    for (int i = 0; event->data[i] && j < sizeof(escaped_data) - 1; i++) {
+    for (int i = 0; event->data[i] && j < (int)sizeof(escaped_data) - 1; i++) {
         if (event->data[i] == '"') {
             escaped_data[j++] = '\\';
             escaped_data[j++] = '"';
@@ -165,6 +165,8 @@ int redis_get_event(redis_connection_t *conn, struct ravn_event *event) {
 
 // Subscribe to events (simplified implementation)
 int redis_subscribe_events(redis_connection_t *conn, void (*callback)(const struct ravn_event *)) {
+    (void)conn; // Suppress unused parameter warning
+    (void)callback; // Suppress unused parameter warning
     // This would implement Redis pub/sub for real-time events
     // For now, just return success
     printf("[Redis] Event subscription not implemented yet\n");
@@ -231,6 +233,8 @@ int redis_get_threat_level(redis_connection_t *conn, threat_level_t *threat) {
 
 // Subscribe to threat level updates (simplified implementation)
 int redis_subscribe_threat_updates(redis_connection_t *conn, void (*callback)(const threat_level_t *)) {
+    (void)conn; // Suppress unused parameter warning
+    (void)callback; // Suppress unused parameter warning
     // This would implement Redis pub/sub for real-time threat updates
     // For now, just return success
     printf("[Redis] Threat level subscription not implemented yet\n");

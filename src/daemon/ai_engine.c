@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <hiredis/hiredis.h>
+#include <stdint.h>
 #include "ai_engine.h"
 #include "redis_client.h"
 #include "ebpf_handler.h"
@@ -95,6 +96,7 @@ int ai_engine_start_analysis(ai_engine_t *engine) {
 
 // Stop AI analysis (no internal threading - handled by main daemon)
 void ai_engine_stop_analysis(ai_engine_t *engine) {
+    (void)engine; // Suppress unused parameter warning
     printf("[AI] AI analysis stopped\n");
 }
 
@@ -160,6 +162,9 @@ int sliding_window_init(struct sliding_window *window) {
     return 0;
 }
 
+// Forward declaration
+void sliding_window_cleanup(struct sliding_window *window);
+
 // Cleanup sliding window
 void sliding_window_cleanup(struct sliding_window *window) {
     if (!window) {
@@ -187,7 +192,7 @@ int sliding_window_update(struct sliding_window *window, uint64_t current_time) 
             struct event_sequence *seq = &window->processes[i];
             int keep_count = 0;
             
-            for (int j = 0; j < seq->event_count; j++) {
+            for (uint32_t j = 0; j < seq->event_count; j++) {
                 if (seq->timestamps[j] >= window->start_time) {
                     if (keep_count != j) {
                         seq->events[keep_count] = seq->events[j];
@@ -252,6 +257,7 @@ int sliding_window_analyze(struct sliding_window *window) {
 
 // Process event (legacy function)
 int ai_process_event(const char *event_json) {
+    (void)event_json; // Suppress unused parameter warning
     // This function is kept for compatibility but not used in new implementation
     return 0;
 }
@@ -284,7 +290,7 @@ float ai_calculate_threat_score(struct event_sequence *sequence) {
     
     // Feature 2: Unique event types
     int unique_types = 0;
-    for (int i = 0; i < sequence->event_count; i++) {
+    for (uint32_t i = 0; i < sequence->event_count; i++) {
         int is_unique = 1;
         for (int j = 0; j < i; j++) {
             if (sequence->events[i] == sequence->events[j]) {
@@ -319,15 +325,16 @@ float ai_calculate_threat_score(struct event_sequence *sequence) {
 
 // Load AI model (uses compiled weights)
 int ai_load_model(const char *model_path) {
+    (void)model_path; // Suppress unused parameter warning
     if (!global_ai_engine) {
         LOG_ERROR("Invalid AI engine instance");
         return -1;
     }
     
     // Copy weights from compiled header
-    memcpy(global_ai_engine->weights, model_weights, sizeof(model_weights));
+    memcpy(global_ai_engine->weights, all_model_weights, sizeof(all_model_weights));
     
-    LOG_INFO("Model loaded successfully from compiled weights (%d weights)", MODEL_WEIGHT_COUNT);
+    LOG_INFO("Model loaded successfully from compiled weights (%d weights)", TOTAL_WEIGHT_COUNT);
     LOG_INFO("Model info: %s (version %d)", model_info, model_version);
     return 0;
 }
@@ -409,7 +416,7 @@ void* ai_thread_func(void *arg) {
     while (!engine->should_stop) {
         // Check if Redis connection is available
         if (!redis_conn || redis_ping(redis_conn) != 0) {
-            usleep(1000000); // Sleep 1 second if Redis not available
+            sleep(1); // Sleep 1 second if Redis not available
             continue;
         }
         

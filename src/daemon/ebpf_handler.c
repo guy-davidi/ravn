@@ -17,7 +17,7 @@
 // Global variables for real-time monitoring
 static int monitoring_active = 0;
 static pthread_t monitoring_thread;
-static FILE *proc_monitor = NULL;
+// static FILE *proc_monitor = NULL; // Unused variable - commented out
 
 // External Redis connection (set by main.c)
 extern void* global_redis_conn_ptr;
@@ -28,6 +28,7 @@ char* redis_get_last_error(void);
 
 // Real system monitoring using /proc filesystem
 static void* real_time_monitor(void *arg) {
+    (void)arg; // Suppress unused parameter warning
     LOG_INFO("Starting real-time system monitoring");
     
     static unsigned long last_cpu_user = 0, last_cpu_system = 0, last_cpu_idle = 0;
@@ -176,7 +177,7 @@ static void* real_time_monitor(void *arg) {
             }
         }
         
-        usleep(2000000); // 2 second monitoring interval for real data
+        sleep(2); // 2 second monitoring interval for real data
     }
     
     printf("[eBPF] Real-time monitoring stopped\n");
