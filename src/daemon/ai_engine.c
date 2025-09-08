@@ -13,6 +13,7 @@
 #include "redis_client.h"
 #include "ebpf_handler.h"
 #include "../utils/logger.h"
+#include "model_weights.h"  // Generated model weights
 
 // Global AI engine instance
 static ai_engine_t *global_ai_engine = NULL;
@@ -66,6 +67,8 @@ void ai_engine_cleanup(ai_engine_t *engine) {
     
     // Stop analysis thread
     ai_engine_stop_thread(engine);
+    
+    // No cleanup needed for simple weights
     
     // Cleanup sliding window
     memset(&engine->window, 0, sizeof(engine->window));
@@ -314,41 +317,18 @@ float ai_calculate_threat_score(struct event_sequence *sequence) {
     return score;
 }
 
-// Load AI model
+// Load AI model (uses compiled weights)
 int ai_load_model(const char *model_path) {
-    if (!model_path || !global_ai_engine) {
-        LOG_ERROR("Invalid parameters for model loading");
+    if (!global_ai_engine) {
+        LOG_ERROR("Invalid AI engine instance");
         return -1;
     }
     
-    FILE *file = fopen(model_path, "rb");
-    if (!file) {
-        LOG_ERROR("Cannot open model file: %s", model_path);
-        return -1;
-    }
+    // Copy weights from compiled header
+    memcpy(global_ai_engine->weights, model_weights, sizeof(model_weights));
     
-    // Get file size for validation
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    if (file_size < 100 * sizeof(float)) {
-        LOG_ERROR("Model file too small: %ld bytes (expected at least %zu bytes)", 
-                file_size, 100 * sizeof(float));
-        fclose(file);
-        return -1;
-    }
-    
-    // Read model weights (simplified)
-    size_t read_count = fread(global_ai_engine->weights, sizeof(float), 100, file);
-    fclose(file);
-    
-    if (read_count != 100) {
-        LOG_ERROR("Failed to read model weights: read %zu of 100 floats", read_count);
-        return -1;
-    }
-    
-    LOG_INFO("Model loaded successfully from %s (%ld bytes)", model_path, file_size);
+    LOG_INFO("Model loaded successfully from compiled weights (%d weights)", MODEL_WEIGHT_COUNT);
+    LOG_INFO("Model info: %s (version %d)", model_info, model_version);
     return 0;
 }
 
@@ -369,35 +349,6 @@ float ai_predict(const float *features, int feature_count) {
     score = 1.0f / (1.0f + expf(-score));
     
     return score;
-}
-
-// Save AI model
-int ai_save_model(const char *model_path) {
-    if (!model_path || !global_ai_engine || !global_ai_engine->initialized) {
-        return -1;
-    }
-    
-    FILE *file = fopen(model_path, "wb");
-    if (!file) {
-        return -1;
-    }
-    
-    size_t write_count = fwrite(global_ai_engine->weights, sizeof(float), 100, file);
-    fclose(file);
-    
-    if (write_count != 100) {
-        return -1;
-    }
-    
-    printf("[AI] Model saved to %s\n", model_path);
-    return 0;
-}
-
-// Get threat level name
-const char* ai_get_threat_level_name(float score) {
-    if (score > 0.7) return "HIGH";
-    if (score > 0.4) return "MEDIUM";
-    return "LOW";
 }
 
 // Check if sequence is suspicious

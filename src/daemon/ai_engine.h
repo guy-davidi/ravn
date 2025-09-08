@@ -46,7 +46,7 @@ struct sliding_window {
 // AI model structure (simplified)
 typedef struct ai_engine ai_engine_t;
 struct ai_engine {
-    float weights[100]; // Simplified model weights
+    float weights[100]; // Model weights for inference
     int initialized;
     char model_path[256];
     struct sliding_window window;
@@ -80,10 +80,8 @@ float ai_calculate_threat_score(struct event_sequence *sequence);
 // Model functions
 int ai_load_model(const char *model_path);
 float ai_predict(const float *features, int feature_count);
-int ai_save_model(const char *model_path);
 
 // Utility functions
-const char* ai_get_threat_level_name(float score);
 int ai_is_suspicious_sequence(const struct event_sequence *sequence);
 int ai_detect_attack_pattern(const struct event_sequence *sequence);
 
