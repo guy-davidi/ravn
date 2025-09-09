@@ -1,4 +1,4 @@
-# RAVN - Cutting-Edge eBPF Runtime Security
+# RAVN - Runtime Anomaly & Vulnerability Network
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/guy-davidi/ravn)
