@@ -1,5 +1,34 @@
-// RAVN Security Monitor eBPF Program
-// Monitors security-related operations for threat detection
+/*
+ * RAVN Security Monitor - eBPF Program
+ *
+ * This eBPF program monitors security-related operations for threat detection
+ * and security analysis. It captures security-sensitive system calls and
+ * operations in kernel space and forwards them to user space for processing
+ * by the RAVN security platform.
+ *
+ * Copyright (C) 2024 RAVN Security Platform
+ * Author: RAVN Development Team
+ * License: GPL v2
+ *
+ * The security monitor implements:
+ * - Process privilege escalation monitoring
+ * - File permission changes tracking
+ * - Process debugging and tracing detection
+ * - User and group ID changes monitoring
+ * - High-performance ring buffer communication
+ *
+ * Monitored security operations:
+ * - ptrace: Process debugging and tracing
+ * - setuid, setgid: User/group ID changes
+ * - chmod, chown: File permission changes
+ * - mount, umount: Filesystem operations
+ * - capset: Capability changes
+ *
+ * Architecture:
+ * - Kernel-space eBPF program for event capture
+ * - Ring buffer for high-performance data transfer
+ * - User-space handler for event processing
+ */
 
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>

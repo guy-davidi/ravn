@@ -1,5 +1,33 @@
-// RAVN File I/O Monitor eBPF Program
-// Monitors file operations for security analysis
+/*
+ * RAVN File I/O Monitor - eBPF Program
+ *
+ * This eBPF program monitors file I/O operations for security analysis and threat
+ * detection. It captures file-related system calls and operations in kernel space
+ * and forwards them to user space for processing by the RAVN security platform.
+ *
+ * Copyright (C) 2024 RAVN Security Platform
+ * Author: RAVN Development Team
+ * License: GPL v2
+ *
+ * The file monitor implements:
+ * - File open/close operation tracking
+ * - Read/write operation monitoring
+ * - File creation and deletion detection
+ * - File permission and metadata changes
+ * - High-performance ring buffer communication
+ *
+ * Monitored file operations:
+ * - open, openat, close: File descriptor management
+ * - read, write, readv, writev: Data transfer operations
+ * - unlink, rename: File deletion and renaming
+ * - stat, fstat: File metadata access
+ * - chmod, chown: File permission changes
+ *
+ * Architecture:
+ * - Kernel-space eBPF program for event capture
+ * - Ring buffer for high-performance data transfer
+ * - User-space handler for event processing
+ */
 
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>

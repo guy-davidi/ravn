@@ -1,4 +1,4 @@
-# RAVN Security Platform
+# RAVN Runtime Anomaly Vulnerability Network
 
 A professional security monitoring platform that uses eBPF for real-time system monitoring and AI for threat detection.
 

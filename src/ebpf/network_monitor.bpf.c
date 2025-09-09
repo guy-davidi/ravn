@@ -1,5 +1,33 @@
-// RAVN Network Monitor eBPF Program
-// Monitors network operations for security analysis
+/*
+ * RAVN Network Monitor - eBPF Program
+ *
+ * This eBPF program monitors network operations for security analysis and threat
+ * detection. It captures network-related system calls and socket operations in
+ * kernel space and forwards them to user space for processing by the RAVN
+ * security platform.
+ *
+ * Copyright (C) 2024 RAVN Security Platform
+ * Author: RAVN Development Team
+ * License: GPL v2
+ *
+ * The network monitor implements:
+ * - Socket creation and management monitoring
+ * - Network connection tracking
+ * - Data transfer monitoring
+ * - Protocol and address family detection
+ * - High-performance ring buffer communication
+ *
+ * Monitored network operations:
+ * - connect, bind, listen, accept: Connection management
+ * - send, recv: Data transfer operations
+ * - socket: Socket creation
+ * - getsockopt, setsockopt: Socket configuration
+ *
+ * Architecture:
+ * - Kernel-space eBPF program for event capture
+ * - Ring buffer for high-performance data transfer
+ * - User-space handler for event processing
+ */
 
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>

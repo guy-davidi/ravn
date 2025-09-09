@@ -1,3 +1,24 @@
+/*
+ * RAVN Security Platform - Main Entry Point
+ *
+ * This file implements the main entry point for the RAVN security platform,
+ * providing both daemon and CLI modes for real-time threat detection and
+ * system monitoring using eBPF, Redis, and AI-powered analysis.
+ *
+ * Copyright (C) 2024 RAVN Security Platform
+ * Author: RAVN Development Team
+ * License: GPL v2
+ *
+ * Architecture:
+ * - Layer 1: eBPF system monitoring (kernel-space event capture)
+ * - Layer 2: Redis data storage (high-performance event handling)
+ * - Layer 3: AI analysis engine (threat detection and scoring)
+ *
+ * The platform operates in two modes:
+ * 1. Daemon mode: Continuous monitoring with background AI analysis
+ * 2. CLI mode: Interactive dashboard for real-time system status
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,26 +36,51 @@
 #include "daemon/ai_engine.h"
 #include "utils/logger.h"
 
-// Global variables for cleanup
-static int daemon_running = 0;
-static redis_connection_t *redis_conn = NULL;
-static ai_engine_t *ai_engine = NULL;
-// AI thread is now managed by the AI engine module
+/*
+ * Global state variables for daemon lifecycle management
+ */
+static int daemon_running = 0;		/* Daemon running state flag */
+static redis_connection_t *redis_conn = NULL;	/* Redis connection handle */
+static ai_engine_t *ai_engine = NULL;		/* AI engine instance */
 
-// Global Redis connection pointer for eBPF handler
-void* global_redis_conn_ptr = NULL;
+/*
+ * Global Redis connection pointer for eBPF handler
+ * This allows eBPF programs to access Redis for event storage
+ */
+void *global_redis_conn_ptr = NULL;
 
-// Signal handler for graceful shutdown
-void signal_handler(int sig) {
-    LOG_INFO_MODULE("MAIN", "Received signal %d, shutting down gracefully...", sig);
-    daemon_running = 0;
-    // AI thread is managed by AI engine
+/**
+ * signal_handler - Handle system signals for graceful shutdown
+ * @sig: Signal number received
+ *
+ * This function handles SIGINT and SIGTERM signals to perform
+ * graceful shutdown of the daemon. It sets the daemon_running
+ * flag to false, which causes the main monitoring loop to exit.
+ *
+ * Context: Signal handler context (must be signal-safe)
+ */
+void signal_handler(int sig)
+{
+	LOG_INFO_MODULE("MAIN", "Received signal %d, shutting down gracefully...", sig);
+	daemon_running = 0;
+	/* AI thread cleanup is managed by AI engine module */
 }
 
-// AI thread function is now handled by the AI engine module
-
-// Initialize daemon components in proper layered order
-int init_daemon() {
+/**
+ * init_daemon - Initialize daemon components in layered architecture
+ *
+ * Initializes the RAVN daemon components in a proper layered order:
+ * 1. Layer 1: eBPF handlers (lowest level - system monitoring)
+ * 2. Layer 2: Redis database (middle layer - data storage)
+ * 3. Layer 3: AI engine (highest level - analysis)
+ *
+ * Each layer depends on the previous layers, and initialization
+ * failures result in proper cleanup of already initialized layers.
+ *
+ * Return: 0 on success, -1 on failure
+ */
+int init_daemon(void)
+{
     LOG_INFO_MODULE("MAIN", "Initializing daemon components in layered architecture...");
     
     // Layer 1: Initialize eBPF handlers (lowest level - system monitoring)
@@ -84,8 +130,19 @@ int init_daemon() {
     return 0;
 }
 
-// Cleanup daemon components in reverse layered order
-void cleanup_daemon() {
+/**
+ * cleanup_daemon - Cleanup daemon components in reverse layered order
+ *
+ * Performs cleanup of daemon components in reverse order of initialization:
+ * 1. Layer 3: AI engine cleanup (highest level first)
+ * 2. Layer 2: Redis database cleanup (middle layer)
+ * 3. Layer 1: eBPF handlers cleanup (lowest level last)
+ *
+ * This ensures proper resource deallocation and prevents resource leaks.
+ * The function is safe to call multiple times and handles NULL pointers.
+ */
+void cleanup_daemon(void)
+{
     LOG_INFO_MODULE("MAIN", "Cleaning up daemon components in reverse layered order...");
     
     // Layer 3: Cleanup AI engine (highest level first)
@@ -115,8 +172,23 @@ void cleanup_daemon() {
     LOG_INFO_MODULE("MAIN", "✓ All layers cleaned up successfully");
 }
 
-// Daemon mode - main monitoring loop with AI thread
-int run_daemon_mode() {
+/**
+ * run_daemon_mode - Run daemon in continuous monitoring mode
+ *
+ * Starts the RAVN daemon in continuous monitoring mode with the following
+ * components running:
+ * - eBPF system monitoring (kernel-space event capture)
+ * - Redis data storage (high-performance event handling)
+ * - AI analysis thread (background threat detection)
+ *
+ * The daemon runs until a signal is received (SIGINT/SIGTERM) or a
+ * critical error occurs. The main loop monitors system health and
+ * handles Redis reconnection if needed.
+ *
+ * Return: 0 on normal shutdown, -1 on initialization failure
+ */
+int run_daemon_mode(void)
+{
     LOG_INFO("Starting daemon mode (eBPF monitoring + AI thread)");
     
     if (init_daemon() != 0) {
@@ -154,8 +226,29 @@ int run_daemon_mode() {
     return 0;
 }
 
-// CLI mode - simple dashboard
-int run_cli_mode() {
+/**
+ * run_cli_mode - Run CLI dashboard mode
+ *
+ * Starts the RAVN platform in CLI dashboard mode, providing a real-time
+ * terminal-based interface for monitoring system status and threat levels.
+ *
+ * Features:
+ * - Real-time threat level display with color coding
+ * - System status monitoring (Redis, eBPF, AI)
+ * - Live metrics dashboard (events, uptime, memory usage)
+ * - Activity feed showing recent system events
+ * - Professional TUI interface with Unicode box drawing
+ *
+ * The dashboard updates every 2 seconds and displays:
+ * - Current threat level and score
+ * - System component status
+ * - Event counters and system metrics
+ * - Recent activity feed
+ *
+ * Return: 0 on normal exit, -1 on Redis connection failure
+ */
+int run_cli_mode(void)
+{
     LOG_INFO_MODULE("MAIN", "Starting CLI mode...");
     
     // Connect to Redis to read data
@@ -329,8 +422,15 @@ int run_cli_mode() {
     return 0;
 }
 
-// Print usage information
-void print_usage(const char *progname) {
+/**
+ * print_usage - Print command line usage information
+ * @progname: Program name (argv[0])
+ *
+ * Displays comprehensive usage information for the RAVN security platform,
+ * including available modes, options, and usage examples.
+ */
+void print_usage(const char *progname)
+{
     printf("RAVN Security Platform - eBPF-based Threat Detection\n");
     printf("\nUsage: %s [OPTIONS] [MODE]\n", progname);
     printf("\nModes:\n");
@@ -345,14 +445,42 @@ void print_usage(const char *progname) {
     printf("  %s -h        # Show help\n", progname);
 }
 
-// Print version information
-void print_version() {
+/**
+ * print_version - Print version and build information
+ *
+ * Displays version information, build details, and technology stack
+ * for the RAVN security platform.
+ */
+void print_version(void)
+{
     printf("RAVN Security Platform v1.0.0\n");
     printf("eBPF-based Real-time Threat Detection\n");
     printf("Built with C, libbpf, Redis, and AI\n");
 }
 
-int main(int argc, char *argv[]) {
+/**
+ * main - Main entry point for RAVN Security Platform
+ * @argc: Argument count
+ * @argv: Argument vector
+ *
+ * Main entry point that handles command line argument parsing and
+ * delegates to the appropriate mode (daemon or CLI). Performs the
+ * following operations:
+ *
+ * 1. Parse command line arguments using getopt_long
+ * 2. Initialize logging system
+ * 3. Setup signal handlers for graceful shutdown
+ * 4. Execute the requested mode (daemon/cli)
+ * 5. Perform cleanup and exit
+ *
+ * Supported modes:
+ * - daemon/d: Run continuous monitoring daemon
+ * - cli/c: Run interactive CLI dashboard
+ *
+ * Return: 0 on success, 1 on error
+ */
+int main(int argc, char *argv[])
+{
     int opt;
     char *mode = NULL;
     
