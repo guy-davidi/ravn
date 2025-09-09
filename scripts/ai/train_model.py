@@ -21,7 +21,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import matplotlib.pyplot as plt
 
 class RAVNModelTrainer:
-    def __init__(self, sequence_length: int = 20, feature_dim: int = 10):
+    def __init__(self, sequence_length: int = 20, feature_dim: int = 64):
         """Initialize the model trainer"""
         self.sequence_length = sequence_length
         self.feature_dim = feature_dim
@@ -87,9 +87,15 @@ class RAVNModelTrainer:
                 event_features.append(0)
             event_features = event_features[:self.feature_dim]
             
-            features.append(event_features)
+            features.extend(event_features)
         
-        return np.array(features)
+        # Ensure we have exactly 64 features total
+        while len(features) < 64:
+            features.append(0)
+        features = features[:64]
+        
+        # Reshape to (1, 64) to represent 1 timestep with 64 features
+        return np.array(features, dtype=np.float32).reshape(1, 64)
     
     def prepare_data(self, dataset: Dict[str, List[Dict[str, Any]]]) -> Tuple[np.ndarray, np.ndarray]:
         """Prepare training data from dataset"""
@@ -165,6 +171,7 @@ class RAVNModelTrainer:
         print(f"Test set: {X_test.shape[0]} samples")
         
         # Build model
+        # X_train shape should be (samples, timesteps, features) = (samples, 1, 64)
         self.model = self.build_model((X_train.shape[1], X_train.shape[2]))
         
         # Print model summary

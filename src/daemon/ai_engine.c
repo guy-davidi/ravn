@@ -161,7 +161,7 @@ int sliding_window_init(struct sliding_window *window) {
     window->end_time = window->start_time + WINDOW_SIZE_SECONDS;
     window->process_count = 0;
     window->overall_threat_score = 0.0f;
-    strcpy(window->threat_level, "LOW");
+    strcpy(window->threat_level_str, "LOW");
     strcpy(window->threat_reason, "Normal activity");
     
     return 0;
@@ -242,15 +242,15 @@ int sliding_window_analyze(struct sliding_window *window) {
     
     // Determine threat level and reason
     if (window->overall_threat_score > 0.7) {
-        strcpy(window->threat_level, "HIGH");
+        strcpy(window->threat_level_str, "HIGH");
         snprintf(window->threat_reason, sizeof(window->threat_reason),
                 "High threat detected in %d processes", suspicious_processes);
     } else if (window->overall_threat_score > 0.4) {
-        strcpy(window->threat_level, "MEDIUM");
+        strcpy(window->threat_level_str, "MEDIUM");
         snprintf(window->threat_reason, sizeof(window->threat_reason),
                 "Medium threat detected in %d processes", suspicious_processes);
     } else {
-        strcpy(window->threat_level, "LOW");
+        strcpy(window->threat_level_str, "LOW");
         strcpy(window->threat_reason, "Normal activity");
     }
     

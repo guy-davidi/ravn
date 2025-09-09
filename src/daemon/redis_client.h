@@ -75,10 +75,10 @@ struct threat_level {
  */
 
 /**
- * enum threat_level - Threat level classifications
+ * enum threat_level_enum - Threat level classifications
  * Used throughout the system for consistent threat assessment
  */
-enum threat_level {
+enum threat_level_enum {
 	THREAT_LOW = 0,		/* Normal system activity */
 	THREAT_MEDIUM = 1,	/* Suspicious activity detected */
 	THREAT_HIGH = 2,	/* High probability of attack */

@@ -42,7 +42,6 @@ def generate_c_header(weights_file: str, output_header: str):
 
 // Model architecture constants
 #define INPUT_SEQUENCE_LENGTH 20
-#define INPUT_FEATURE_DIM 10
 #define DENSE1_OUTPUT_SIZE 64
 #define LSTM1_HIDDEN_SIZE 128
 #define LSTM2_HIDDEN_SIZE 64
