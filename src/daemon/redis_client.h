@@ -70,13 +70,20 @@ struct threat_level {
 };
 
 /*
- * Threat Level Constants
- * These values define the threat level classifications
+ * Threat Level Enums - Comprehensive threat classification system
+ * These enums make threat level handling more readable and maintainable
  */
-#define THREAT_LOW 0		/* Normal system activity */
-#define THREAT_MEDIUM 1		/* Suspicious activity detected */
-#define THREAT_HIGH 2		/* High probability of attack */
-#define THREAT_CRITICAL 3	/* Critical threat confirmed */
+
+/**
+ * enum threat_level - Threat level classifications
+ * Used throughout the system for consistent threat assessment
+ */
+enum threat_level {
+	THREAT_LOW = 0,		/* Normal system activity */
+	THREAT_MEDIUM = 1,	/* Suspicious activity detected */
+	THREAT_HIGH = 2,	/* High probability of attack */
+	THREAT_CRITICAL = 3	/* Critical threat confirmed */
+};
 
 /*
  * Redis Connection Management Functions

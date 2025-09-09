@@ -33,12 +33,169 @@
 struct ravn_event;
 
 /*
+ * Event Type Enums - Comprehensive categorization of security events
+ * These enums make the code more readable and maintainable
+ */
+
+/**
+ * enum process_event_type - Process-related event types
+ */
+enum process_event_type {
+	PROCESS_SPAWN = 1,		/* Process creation (execve, fork, clone) */
+	PROCESS_EXIT = 2,		/* Process termination */
+	PROCESS_WORKING_DIR_CHANGE = 3,	/* Working directory change (chdir) */
+	PROCESS_ENV_VAR_CHANGE = 4,	/* Environment variable modification */
+	PROCESS_SIGNAL_HANDLING = 5,	/* Signal handling (kill, signal) */
+	PROCESS_PRIORITY_CHANGE = 6,	/* Priority change (nice, setpriority) */
+	PROCESS_GROUP_OPERATION = 7,	/* Process group operations */
+	PROCESS_SESSION_OPERATION = 8,	/* Session operations */
+	PROCESS_AFFINITY_CHANGE = 9,	/* CPU affinity changes */
+	PROCESS_MEMORY_MAP = 10,	/* Memory mapping operations */
+	PROCESS_CREDENTIAL_CHANGE = 11,	/* Credential changes (setuid, setgid) */
+	PROCESS_COMMAND_COMPLEXITY = 12	/* Command complexity estimation */
+};
+
+/**
+ * enum file_event_type - File operation event types
+ */
+enum file_event_type {
+	FILE_SENSITIVE_ACCESS = 1,	/* Access to sensitive files */
+	FILE_EXECUTABLE_ACCESS = 2,	/* Access to executable files */
+	FILE_CONFIG_ACCESS = 3,		/* Access to configuration files */
+	FILE_LOG_ACCESS = 4,		/* Access to log files */
+	FILE_TEMP_OPERATION = 5,	/* Temporary file operations */
+	FILE_CREATION = 6,		/* File creation */
+	FILE_DELETION = 7,		/* File deletion */
+	FILE_MODIFICATION = 8,		/* File modification */
+	FILE_DIRECTORY_TRAVERSAL = 9,	/* Directory traversal */
+	FILE_PERMISSION_CHANGE = 10	/* File permission changes */
+};
+
+/**
+ * enum network_event_type - Network operation event types
+ */
+enum network_event_type {
+	NETWORK_CONNECTION = 1,		/* Network connection establishment */
+	NETWORK_SUSPICIOUS_PORT = 2,	/* Connection to suspicious ports */
+	NETWORK_DATA_TRANSFER = 3,	/* Data transfer operations */
+	NETWORK_CONNECTION_DURATION = 4, /* Connection duration analysis */
+	NETWORK_PROTOCOL_DIVERSITY = 5,	/* Multiple protocol usage */
+	NETWORK_EXTERNAL_CONNECTION = 6, /* External network connections */
+	NETWORK_PORT_SCANNING = 7,	/* Port scanning behavior */
+	NETWORK_ERROR = 8		/* Network error events */
+};
+
+/**
+ * enum security_event_type - Security-related event types
+ */
+enum security_event_type {
+	SECURITY_PRIVILEGE_ESCALATION = 1,	/* Privilege escalation attempts */
+	SECURITY_AUTHENTICATION = 2,		/* Authentication events */
+	SECURITY_FAILED_OPERATION = 3,		/* Failed security operations */
+	SECURITY_SUSPICIOUS_SYSCALL = 4,	/* Suspicious system calls */
+	SECURITY_CAPABILITY_USAGE = 5,		/* Capability usage */
+	SECURITY_CONTEXT_CHANGE = 6,		/* Security context changes */
+	SECURITY_AUDIT_EVENT = 7,		/* Audit events */
+	SECURITY_POLICY_VIOLATION = 8		/* Security policy violations */
+};
+
+/**
+ * enum behavioral_event_type - Behavioral pattern event types
+ */
+enum behavioral_event_type {
+	BEHAVIORAL_STEALTH = 1,		/* Stealth behavior patterns */
+	BEHAVIORAL_PERSISTENCE = 2,	/* Persistence attempts */
+	BEHAVIORAL_EVASION = 3,		/* Evasion techniques */
+	BEHAVIORAL_LATERAL_MOVEMENT = 4,	/* Lateral movement patterns */
+	BEHAVIORAL_DATA_EXFILTRATION = 5,	/* Data exfiltration patterns */
+	BEHAVIORAL_COMMAND_INJECTION = 6,	/* Command injection attempts */
+	BEHAVIORAL_BUFFER_OVERFLOW = 7,		/* Buffer overflow patterns */
+	BEHAVIORAL_CODE_INJECTION = 8,		/* Code injection patterns */
+	BEHAVIORAL_ANTI_FORENSICS = 9,		/* Anti-forensics techniques */
+	BEHAVIORAL_COMMUNICATION = 10		/* Communication patterns */
+};
+
+/**
+ * enum threat_classification - Threat level classifications
+ */
+enum threat_classification {
+	THREAT_NORMAL = 0,		/* Normal system activity */
+	THREAT_SUSPICIOUS = 1,		/* Suspicious activity detected */
+	THREAT_MALICIOUS = 2		/* Malicious activity confirmed */
+};
+
+/**
+ * enum temporal_feature_type - Temporal pattern feature types
+ */
+enum temporal_feature_type {
+	TEMPORAL_EVENT_FREQUENCY = 0,		/* Events per second */
+	TEMPORAL_BURST_INTENSITY = 1,		/* Events in 1-second bursts */
+	TEMPORAL_TIME_REGULARITY = 2,		/* Standard deviation of intervals */
+	TEMPORAL_SEQUENCE_DURATION = 3,		/* Sequence duration (normalized) */
+	TEMPORAL_PEAK_ACTIVITY_TIME = 4,	/* When most events occurred */
+	TEMPORAL_QUIET_PERIODS = 5,		/* Periods with no events */
+	TEMPORAL_ACCELERATION_RATE = 6,		/* Increasing event frequency */
+	TEMPORAL_DECELERATION_RATE = 7		/* Decreasing event frequency */
+};
+
+/**
+ * enum system_feature_type - System resource usage feature types
+ */
+enum system_feature_type {
+	SYSTEM_CPU_INTENSITY = 0,		/* CPU usage intensity */
+	SYSTEM_MEMORY_INTENSITY = 1,		/* Memory usage intensity */
+	SYSTEM_DISK_IO_INTENSITY = 2,		/* Disk I/O intensity */
+	SYSTEM_LOAD_IMPACT = 3,			/* System load impact */
+	SYSTEM_RESOURCE_CONTENTION = 4,		/* Resource contention */
+	SYSTEM_SYSCALL_FREQUENCY = 5,		/* System call frequency */
+	SYSTEM_INTERRUPT_HANDLING = 6,		/* Interrupt handling */
+	SYSTEM_KERNEL_OPERATIONS = 7		/* Kernel operations */
+};
+
+/**
+ * enum feature_category - Feature extraction categories
+ */
+enum feature_category {
+	FEATURE_TEMPORAL = 0,		/* Temporal pattern features */
+	FEATURE_PROCESS = 1,		/* Process behavior features */
+	FEATURE_FILE = 2,		/* File access pattern features */
+	FEATURE_NETWORK = 3,		/* Network behavior features */
+	FEATURE_SECURITY = 4,		/* Security event features */
+	FEATURE_SYSTEM = 5,		/* System resource usage features */
+	FEATURE_BEHAVIORAL = 6		/* Behavioral pattern features */
+};
+
+/*
  * AI Model Configuration Parameters
  */
 #define WINDOW_SIZE_SECONDS 10		/* Sliding window duration in seconds */
 #define SLIDE_INTERVAL_SECONDS 1	/* Window slide interval in seconds */
 #define MAX_EVENTS_PER_WINDOW 1000	/* Maximum events per process in window */
 #define MAX_PROCESSES 100		/* Maximum processes to track simultaneously */
+
+/*
+ * RAVN Security Feature Extraction Parameters
+ * Multi-dimensional feature extraction for comprehensive threat detection
+ */
+#define TOTAL_FEATURES 64		/* Total number of extracted features */
+#define TEMPORAL_FEATURES 8		/* Time-based pattern features */
+#define PROCESS_FEATURES 12		/* Process behavior features */
+#define FILE_FEATURES 10		/* File access pattern features */
+#define NETWORK_FEATURES 8		/* Network behavior features */
+#define SECURITY_FEATURES 8		/* Security event features */
+#define SYSTEM_FEATURES 8		/* System resource usage features */
+#define BEHAVIORAL_FEATURES 10		/* Behavioral pattern features */
+
+/*
+ * Feature Category Offsets
+ */
+#define TEMPORAL_OFFSET 0		/* Temporal features start at index 0 */
+#define PROCESS_OFFSET 8		/* Process features start at index 8 */
+#define FILE_OFFSET 20		/* File features start at index 20 */
+#define NETWORK_OFFSET 30		/* Network features start at index 30 */
+#define SECURITY_OFFSET 38		/* Security features start at index 38 */
+#define SYSTEM_OFFSET 46		/* System features start at index 46 */
+#define BEHAVIORAL_OFFSET 54		/* Behavioral features start at index 54 */
 
 /*
  * Threat Level Thresholds
@@ -324,5 +481,101 @@ int ai_is_suspicious_sequence(const struct event_sequence *sequence);
  * Return: 1 if attack pattern detected, 0 if normal, -1 on error
  */
 int ai_detect_attack_pattern(const struct event_sequence *sequence);
+
+/*
+ * RAVN Security Feature Extraction Functions
+ */
+
+/**
+ * extract_features_from_events - Extract comprehensive features from event sequence
+ * @sequence: Event sequence to analyze
+ * @features: Output array for extracted features (must be TOTAL_FEATURES size)
+ *
+ * Extracts 64 multi-dimensional features from the event sequence using the
+ * RAVN Security Feature Extraction Algorithm. Features are organized into
+ * categories: temporal, process, file, network, security, system, and behavioral.
+ *
+ * Return: 0 on success, -1 on failure
+ */
+int extract_features_from_events(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_temporal_features - Extract temporal pattern features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for temporal features (8 features)
+ *
+ * Extracts time-based pattern features including event frequency, burst
+ * intensity, time regularity, and sequence duration.
+ */
+void extract_temporal_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_process_features - Extract process behavior features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for process features (12 features)
+ *
+ * Extracts process behavior features including spawn count, tree depth,
+ * command complexity, and process management operations.
+ */
+void extract_process_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_file_features - Extract file access pattern features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for file features (10 features)
+ *
+ * Extracts file access pattern features including sensitive file access,
+ * executable file operations, and file permission changes.
+ */
+void extract_file_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_network_features - Extract network behavior features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for network features (8 features)
+ *
+ * Extracts network behavior features including connection count, suspicious
+ * port usage, data transfer volume, and protocol diversity.
+ */
+void extract_network_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_security_features - Extract security event features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for security features (8 features)
+ *
+ * Extracts security event features including privilege escalation attempts,
+ * authentication events, failed operations, and suspicious syscalls.
+ */
+void extract_security_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_system_features - Extract system resource usage features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for system features (8 features)
+ *
+ * Extracts system resource usage features including CPU usage, memory
+ * consumption, disk I/O intensity, and system load impact.
+ */
+void extract_system_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * extract_behavioral_features - Extract behavioral pattern features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for behavioral features (10 features)
+ *
+ * Extracts behavioral pattern features including stealth behavior, persistence
+ * attempts, evasion techniques, and lateral movement patterns.
+ */
+void extract_behavioral_features(const struct event_sequence *sequence, float *features);
+
+/**
+ * normalize_features - Normalize features to [0,1] range
+ * @features: Feature array to normalize
+ * @count: Number of features to normalize
+ *
+ * Normalizes all features to the [0,1] range for consistent neural network input.
+ */
+void normalize_features(float *features, int count);
 
 #endif // RAVN_AI_ENGINE_H

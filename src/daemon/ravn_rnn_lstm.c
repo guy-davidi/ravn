@@ -447,9 +447,9 @@ int ravn_model_predict_class(ravn_model_t *model, const float *sequence, size_t 
 
 const char* ravn_model_class_name(int class_id) {
     switch (class_id) {
-        case 0: return "Normal";
-        case 1: return "Suspicious";
-        case 2: return "Attack";
+        case CLASS_NORMAL: return "Normal";
+        case CLASS_SUSPICIOUS: return "Suspicious";
+        case CLASS_ATTACK: return "Attack";
         default: return "Unknown";
     }
 }

@@ -19,7 +19,7 @@
  *
  * Architecture:
  * - Input: Variable-length event sequences (up to 20 timesteps)
- * - Dense Layer 1: Feature transformation (200 -> 64)
+ * - Dense Layer 1: Feature transformation (1280 -> 64)
  * - LSTM Layer 1: Sequence processing (64 -> 128)
  * - LSTM Layer 2: Sequence processing (128 -> 64)
  * - Dense Layer 2: Feature reduction (64 -> 32)
@@ -46,12 +46,27 @@
  * the generated model weights from the training process.
  */
 #define INPUT_SEQUENCE_LENGTH 20	/* Maximum sequence length in timesteps */
-#define INPUT_FEATURE_DIM 10		/* Input feature dimension per timestep */
+#define INPUT_FEATURE_DIM 64		/* Input feature dimension per timestep */
 #define DENSE1_OUTPUT_SIZE 64		/* First dense layer output size */
 #define LSTM1_HIDDEN_SIZE 128		/* First LSTM layer hidden size */
 #define LSTM2_HIDDEN_SIZE 64		/* Second LSTM layer hidden size */
 #define DENSE2_OUTPUT_SIZE 32		/* Second dense layer output size */
 #define OUTPUT_CLASSES 3		/* Number of output classes */
+
+/*
+ * Model Classification Enums - Neural network output classifications
+ * These enums make model output handling more readable and maintainable
+ */
+
+/**
+ * enum model_classification - Neural network output classifications
+ * Used for threat detection and classification results
+ */
+enum model_classification {
+	CLASS_NORMAL = 0,		/* Normal system activity */
+	CLASS_SUSPICIOUS = 1,		/* Suspicious activity detected */
+	CLASS_ATTACK = 2		/* Malicious activity confirmed */
+};
 
 /**
  * struct lstm_cell_t - LSTM cell structure
@@ -107,7 +122,7 @@ typedef struct {
 
 /**
  * struct ravn_model_t - Complete RAVN neural network model
- * @dense1: First dense layer (200 -> 64)
+ * @dense1: First dense layer (1280 -> 64)
  * @lstm1: First LSTM layer (64 -> 128)
  * @lstm2: Second LSTM layer (128 -> 64)
  * @dense2: Second dense layer (64 -> 32)
@@ -126,7 +141,7 @@ typedef struct {
  */
 typedef struct {
 	/* Neural network layers */
-	dense_layer_t dense1;		/* Dense layer 1: 200 -> 64 */
+	dense_layer_t dense1;		/* Dense layer 1: 1280 -> 64 */
 	lstm_cell_t lstm1;		/* LSTM layer 1: 64 -> 128 */
 	lstm_cell_t lstm2;		/* LSTM layer 2: 128 -> 64 */
 	dense_layer_t dense2;		/* Dense layer 2: 64 -> 32 */
