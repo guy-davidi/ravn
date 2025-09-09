@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <pthread.h>
+#include "ebpf_handler.h"	/* For event type enums */
 
 /* Forward declaration */
 struct ravn_event;
@@ -55,48 +56,67 @@ enum process_event_type {
 	PROCESS_COMMAND_COMPLEXITY = 12	/* Command complexity estimation */
 };
 
-/**
- * enum file_event_type - File operation event types
+/*
+ * Note: file_event_type, network_event_type, and security_event_type
+ * are defined in ebpf_handler.h and included above
  */
-enum file_event_type {
-	FILE_SENSITIVE_ACCESS = 1,	/* Access to sensitive files */
-	FILE_EXECUTABLE_ACCESS = 2,	/* Access to executable files */
-	FILE_CONFIG_ACCESS = 3,		/* Access to configuration files */
-	FILE_LOG_ACCESS = 4,		/* Access to log files */
-	FILE_TEMP_OPERATION = 5,	/* Temporary file operations */
-	FILE_CREATION = 6,		/* File creation */
-	FILE_DELETION = 7,		/* File deletion */
-	FILE_MODIFICATION = 8,		/* File modification */
-	FILE_DIRECTORY_TRAVERSAL = 9,	/* Directory traversal */
-	FILE_PERMISSION_CHANGE = 10	/* File permission changes */
+
+/*
+ * Feature Extraction Constants - Make code self-documenting
+ * These constants replace magic numbers in feature extraction algorithms
+ */
+
+/**
+ * enum behavioral_pattern_modulo - Behavioral pattern detection modulo values
+ * Used for pattern detection in behavioral feature extraction
+ */
+enum behavioral_pattern_modulo {
+	BEHAVIORAL_PATTERN_MODULO = 20,		/* Modulo for behavioral pattern detection */
+	BEHAVIORAL_STEALTH_PATTERN = 0,		/* Stealth behavior pattern (modulo 20 == 0) */
+	BEHAVIORAL_PERSISTENCE_PATTERN = 1,	/* Persistence pattern (modulo 20 == 1) */
+	BEHAVIORAL_EVASION_PATTERN = 2,		/* Evasion pattern (modulo 20 == 2) */
+	BEHAVIORAL_LATERAL_MOVEMENT_PATTERN = 3,	/* Lateral movement pattern (modulo 20 == 3) */
+	BEHAVIORAL_DATA_EXFILTRATION_PATTERN = 4,	/* Data exfiltration pattern (modulo 20 == 4) */
+	BEHAVIORAL_COMMAND_INJECTION_PATTERN = 5,	/* Command injection pattern (modulo 20 == 5) */
+	BEHAVIORAL_BUFFER_OVERFLOW_PATTERN = 6,	/* Buffer overflow pattern (modulo 20 == 6) */
+	BEHAVIORAL_CODE_INJECTION_PATTERN = 7,		/* Code injection pattern (modulo 20 == 7) */
+	BEHAVIORAL_ANTI_FORENSICS_PATTERN = 8,		/* Anti-forensics pattern (modulo 20 == 8) */
+	BEHAVIORAL_COMMUNICATION_PATTERN = 9		/* Communication pattern (modulo 20 == 9) */
 };
 
 /**
- * enum network_event_type - Network operation event types
+ * enum system_resource_modulo - System resource detection modulo values
+ * Used for resource usage pattern detection
  */
-enum network_event_type {
-	NETWORK_CONNECTION = 1,		/* Network connection establishment */
-	NETWORK_SUSPICIOUS_PORT = 2,	/* Connection to suspicious ports */
-	NETWORK_DATA_TRANSFER = 3,	/* Data transfer operations */
-	NETWORK_CONNECTION_DURATION = 4, /* Connection duration analysis */
-	NETWORK_PROTOCOL_DIVERSITY = 5,	/* Multiple protocol usage */
-	NETWORK_EXTERNAL_CONNECTION = 6, /* External network connections */
-	NETWORK_PORT_SCANNING = 7,	/* Port scanning behavior */
-	NETWORK_ERROR = 8		/* Network error events */
+enum system_resource_modulo {
+	SYSTEM_RESOURCE_MODULO = 10,		/* Modulo for system resource detection */
+	CPU_INTENSIVE_PATTERN = 0,		/* CPU-intensive operations (modulo 10 == 0) */
+	MEMORY_INTENSIVE_PATTERN = 1,		/* Memory-intensive operations (modulo 10 == 1) */
+	DISK_IO_INTENSIVE_PATTERN = 2,		/* Disk I/O operations (modulo 10 == 2) */
+	KERNEL_OPERATIONS_PATTERN = 3		/* Kernel operations (modulo 10 == 3) */
 };
 
 /**
- * enum security_event_type - Security-related event types
+ * enum file_type_modulo - File type detection modulo values
+ * Used for file type classification in feature extraction
  */
-enum security_event_type {
-	SECURITY_PRIVILEGE_ESCALATION = 1,	/* Privilege escalation attempts */
-	SECURITY_AUTHENTICATION = 2,		/* Authentication events */
-	SECURITY_FAILED_OPERATION = 3,		/* Failed security operations */
-	SECURITY_SUSPICIOUS_SYSCALL = 4,	/* Suspicious system calls */
-	SECURITY_CAPABILITY_USAGE = 5,		/* Capability usage */
-	SECURITY_CONTEXT_CHANGE = 6,		/* Security context changes */
-	SECURITY_AUDIT_EVENT = 7,		/* Audit events */
-	SECURITY_POLICY_VIOLATION = 8		/* Security policy violations */
+enum file_type_modulo {
+	FILE_TYPE_MODULO = 10,			/* Modulo for file type detection */
+	SENSITIVE_FILE_PATTERN = 0,		/* Sensitive files (modulo 10 == 0) */
+	EXECUTABLE_FILE_PATTERN = 1,		/* Executable files (modulo 10 == 1) */
+	CONFIG_FILE_PATTERN = 2,		/* Configuration files (modulo 10 == 2) */
+	LOG_FILE_PATTERN = 3,			/* Log files (modulo 10 == 3) */
+	TEMP_FILE_PATTERN = 4			/* Temporary files (modulo 10 == 4) */
+};
+
+/**
+ * enum suspicious_port_values - Suspicious port numbers for network monitoring
+ * Used for detecting suspicious network connections
+ */
+enum suspicious_port_values {
+	SUSPICIOUS_PORT_4444 = 4444,		/* Common backdoor port */
+	SUSPICIOUS_PORT_1337 = 1337,		/* Common hacker port */
+	PORT_MODULO_BASE = 1000		/* Base for port modulo operations */
 };
 
 /**
@@ -232,7 +252,7 @@ struct event_sequence {
  * @processes: Array of process event sequences
  * @process_count: Number of active processes in window
  * @overall_threat_score: Overall threat score for the window
- * @threat_level: Human-readable threat level string
+ * @threat_level_str: Human-readable threat level string
  * @threat_reason: Explanation of threat assessment
  *
  * Represents a time window containing event sequences from multiple
@@ -244,7 +264,7 @@ struct sliding_window {
 	struct event_sequence processes[MAX_PROCESSES];	/* Process sequences */
 	int process_count;				/* Active process count */
 	float overall_threat_score;			/* Overall threat score */
-	char threat_level[16];				/* Threat level string */
+	char threat_level_str[16];			/* Threat level string */
 	char threat_reason[256];			/* Threat reason */
 };
 

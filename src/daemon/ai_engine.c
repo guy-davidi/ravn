@@ -704,34 +704,33 @@ void extract_file_features(const struct event_sequence *sequence, float *feature
         
         // Categorize file operations based on event type
         switch (event_type) {
-            case FILE_SENSITIVE_ACCESS: // Access to sensitive files
-                sensitive_file_access++;
+            case FILE_EVENT_OPEN: // File open operation
+                // Check file type based on event type pattern
+                if (event_type % FILE_TYPE_MODULO == SENSITIVE_FILE_PATTERN) {
+                    sensitive_file_access++;
+                } else if (event_type % FILE_TYPE_MODULO == EXECUTABLE_FILE_PATTERN) {
+                    executable_file_access++;
+                } else if (event_type % FILE_TYPE_MODULO == CONFIG_FILE_PATTERN) {
+                    config_file_access++;
+                } else if (event_type % FILE_TYPE_MODULO == LOG_FILE_PATTERN) {
+                    log_file_access++;
+                } else if (event_type % FILE_TYPE_MODULO == TEMP_FILE_PATTERN) {
+                    temp_file_ops++;
+                }
                 break;
-            case FILE_EXECUTABLE_ACCESS: // Access to executable files
-                executable_file_access++;
-                break;
-            case FILE_CONFIG_ACCESS: // Access to configuration files
-                config_file_access++;
-                break;
-            case FILE_LOG_ACCESS: // Access to log files
-                log_file_access++;
-                break;
-            case FILE_TEMP_OPERATION: // Temporary file operations
-                temp_file_ops++;
-                break;
-            case FILE_CREATION: // File creation
+            case FILE_EVENT_CREATE: // File creation
                 file_creations++;
                 break;
-            case FILE_DELETION: // File deletion
+            case FILE_EVENT_DELETE: // File deletion
                 file_deletions++;
                 break;
-            case FILE_MODIFICATION: // File modification
+            case FILE_EVENT_WRITE: // File modification
                 file_modifications++;
                 break;
-            case FILE_DIRECTORY_TRAVERSAL: // Directory traversal
+            case FILE_EVENT_READ: // Directory traversal (simplified)
                 directory_traversal++;
                 break;
-            case FILE_PERMISSION_CHANGE: // Permission changes
+            case FILE_EVENT_CHMOD: // Permission changes
                 permission_changes++;
                 break;
         }
@@ -776,32 +775,32 @@ void extract_network_features(const struct event_sequence *sequence, float *feat
         
         // Categorize network operations
         switch (event_type) {
-            case NETWORK_CONNECTION: // Network connection establishment
+            case NET_EVENT_SOCKET_CREATE: // Socket creation
                 connections++;
-                // Check for suspicious ports (simplified)
-                if (event_type % 1000 == 4444 || event_type % 1000 == 1337) {
+                break;
+            case NET_EVENT_SOCKET_BIND: // Socket bind operation
+                // Check for suspicious ports using meaningful constants
+                if (event_type % PORT_MODULO_BASE == SUSPICIOUS_PORT_4444 % PORT_MODULO_BASE || 
+                    event_type % PORT_MODULO_BASE == SUSPICIOUS_PORT_1337 % PORT_MODULO_BASE) {
                     suspicious_ports++;
                 }
                 break;
-            case NETWORK_SUSPICIOUS_PORT: // Connection to suspicious ports
-                suspicious_ports++;
+            case NET_EVENT_SOCKET_CONNECT: // Socket connect operation
+                connections++;
                 break;
-            case NETWORK_DATA_TRANSFER: // Data transfer operations
+            case NET_EVENT_SOCKET_SEND: // Socket send operation
                 data_transfer++;
                 break;
-            case NETWORK_CONNECTION_DURATION: // Connection duration analysis
-                connection_duration++;
+            case NET_EVENT_SOCKET_RECV: // Socket receive operation
+                data_transfer++;
                 break;
-            case NETWORK_PROTOCOL_DIVERSITY: // Multiple protocol usage
-                protocol_diversity++;
-                break;
-            case NETWORK_EXTERNAL_CONNECTION: // External network connections
+            case NET_EVENT_SOCKET_ACCEPT: // Socket accept operation
                 external_connections++;
                 break;
-            case NETWORK_PORT_SCANNING: // Port scanning behavior
+            case NET_EVENT_SOCKET_LISTEN: // Socket listen operation
                 port_scanning++;
                 break;
-            case NETWORK_ERROR: // Network error events
+            case NET_EVENT_SOCKET_CLOSE: // Socket close operation
                 network_errors++;
                 break;
         }
@@ -844,29 +843,35 @@ void extract_security_features(const struct event_sequence *sequence, float *fea
         
         // Categorize security events
         switch (event_type) {
-            case SECURITY_PRIVILEGE_ESCALATION: // Privilege escalation attempts
+            case SEC_EVENT_SETUID: // Set user ID operation
                 privilege_escalation++;
                 break;
-            case SECURITY_AUTHENTICATION: // Authentication events
-                authentication_events++;
+            case SEC_EVENT_SETGID: // Set group ID operation
+                privilege_escalation++;
                 break;
-            case SECURITY_FAILED_OPERATION: // Failed security operations
-                failed_operations++;
-                break;
-            case SECURITY_SUSPICIOUS_SYSCALL: // Suspicious system calls
-                suspicious_syscalls++;
-                break;
-            case SECURITY_CAPABILITY_USAGE: // Capability usage
+            case SEC_EVENT_CAPSET: // Capability set operation
                 capability_usage++;
                 break;
-            case SECURITY_CONTEXT_CHANGE: // Security context changes
+            case SEC_EVENT_PRCTL: // Process control operation
                 security_context_changes++;
                 break;
-            case SECURITY_AUDIT_EVENT: // Audit events
-                audit_events++;
+            case SEC_EVENT_SETRESUID: // Set real, effective, and saved user ID
+                privilege_escalation++;
                 break;
-            case SECURITY_POLICY_VIOLATION: // Security policy violations
-                policy_violations++;
+            case SEC_EVENT_SETRESGID: // Set real, effective, and saved group ID
+                privilege_escalation++;
+                break;
+            case SEC_EVENT_SETEUID: // Set effective user ID
+                privilege_escalation++;
+                break;
+            case SEC_EVENT_SETEGID: // Set effective group ID
+                privilege_escalation++;
+                break;
+            case SEC_EVENT_SETREUID: // Set real and effective user ID
+                privilege_escalation++;
+                break;
+            case SEC_EVENT_SETREGID: // Set real and effective group ID
+                privilege_escalation++;
                 break;
         }
     }
@@ -906,21 +911,29 @@ void extract_system_features(const struct event_sequence *sequence, float *featu
     // Calculate system features based on event patterns
     syscall_frequency = (float)sequence->event_count / WINDOW_SIZE_SECONDS;
     
-    // Estimate resource usage based on event types
+    // Estimate resource usage based on event types using meaningful constants
     for (uint32_t i = 0; i < sequence->event_count; i++) {
         uint32_t event_type = sequence->events[i];
         
         // CPU-intensive operations
-        if (event_type % 10 == 0) cpu_intensity += 0.1f;
+        if (event_type % SYSTEM_RESOURCE_MODULO == CPU_INTENSIVE_PATTERN) {
+            cpu_intensity += 0.1f;
+        }
         
         // Memory-intensive operations
-        if (event_type % 10 == 1) memory_intensity += 0.1f;
+        if (event_type % SYSTEM_RESOURCE_MODULO == MEMORY_INTENSIVE_PATTERN) {
+            memory_intensity += 0.1f;
+        }
         
         // Disk I/O operations
-        if (event_type % 10 == 2) disk_io_intensity += 0.1f;
+        if (event_type % SYSTEM_RESOURCE_MODULO == DISK_IO_INTENSIVE_PATTERN) {
+            disk_io_intensity += 0.1f;
+        }
         
         // Kernel operations
-        if (event_type % 10 == 3) kernel_operations += 0.1f;
+        if (event_type % SYSTEM_RESOURCE_MODULO == KERNEL_OPERATIONS_PATTERN) {
+            kernel_operations += 0.1f;
+        }
     }
     
     // Normalize system features using enums for clarity
@@ -957,39 +970,59 @@ void extract_behavioral_features(const struct event_sequence *sequence, float *f
     float anti_forensics = 0.0f;
     float communication_patterns = 0.0f;
     
-    // Detect behavioral patterns based on event sequences
+    // Detect behavioral patterns based on event sequences using meaningful constants
     for (uint32_t i = 0; i < sequence->event_count; i++) {
         uint32_t event_type = sequence->events[i];
         
         // Stealth behavior (hiding activities)
-        if (event_type % 20 == 0) stealth_behavior += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_STEALTH_PATTERN) {
+            stealth_behavior += 0.1f;
+        }
         
         // Persistence attempts (staying resident)
-        if (event_type % 20 == 1) persistence_attempts += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_PERSISTENCE_PATTERN) {
+            persistence_attempts += 0.1f;
+        }
         
         // Evasion techniques (avoiding detection)
-        if (event_type % 20 == 2) evasion_techniques += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_EVASION_PATTERN) {
+            evasion_techniques += 0.1f;
+        }
         
         // Lateral movement (moving between systems)
-        if (event_type % 20 == 3) lateral_movement += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_LATERAL_MOVEMENT_PATTERN) {
+            lateral_movement += 0.1f;
+        }
         
         // Data exfiltration (data theft patterns)
-        if (event_type % 20 == 4) data_exfiltration += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_DATA_EXFILTRATION_PATTERN) {
+            data_exfiltration += 0.1f;
+        }
         
         // Command injection attempts
-        if (event_type % 20 == 5) command_injection += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_COMMAND_INJECTION_PATTERN) {
+            command_injection += 0.1f;
+        }
         
         // Buffer overflow patterns
-        if (event_type % 20 == 6) buffer_overflow_attempts += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_BUFFER_OVERFLOW_PATTERN) {
+            buffer_overflow_attempts += 0.1f;
+        }
         
         // Code injection patterns
-        if (event_type % 20 == 7) code_injection += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_CODE_INJECTION_PATTERN) {
+            code_injection += 0.1f;
+        }
         
         // Anti-forensics (evidence hiding)
-        if (event_type % 20 == 8) anti_forensics += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_ANTI_FORENSICS_PATTERN) {
+            anti_forensics += 0.1f;
+        }
         
         // Communication patterns (C&C communication)
-        if (event_type % 20 == 9) communication_patterns += 0.1f;
+        if (event_type % BEHAVIORAL_PATTERN_MODULO == BEHAVIORAL_COMMUNICATION_PATTERN) {
+            communication_patterns += 0.1f;
+        }
     }
     
     // Normalize behavioral features using enums for clarity
