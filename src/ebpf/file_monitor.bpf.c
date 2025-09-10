@@ -29,7 +29,7 @@ struct {
 
 // Simple test function that generates file events
 SEC("kprobe/vfs_open")
-int trace_file_event(struct pt_regs* ctx) {
+int trace_file_event(struct pt_regs* ctx __attribute__((unused))) {
 	struct file_event* event;
 
 	// Reserve space in ring buffer

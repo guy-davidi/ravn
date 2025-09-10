@@ -58,6 +58,7 @@ static int handle_syscall_event(void* ctx, void* data, size_t data_sz) {
 					.comm = {0}};
 
 	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
 
 	// Create JSON data
 	snprintf(ravn_event.data, sizeof(ravn_event.data),
@@ -97,6 +98,7 @@ static int handle_network_event(void* ctx, void* data, size_t data_sz) {
 					.comm = {0}};
 
 	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
 
 	// Create JSON data
 	snprintf(ravn_event.data, sizeof(ravn_event.data),
@@ -149,6 +151,7 @@ static int handle_security_event(void* ctx, void* data, size_t data_sz) {
 					.comm = {0}};
 
 	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
 
 	// Create JSON data
 	snprintf(ravn_event.data, sizeof(ravn_event.data),
@@ -190,6 +193,7 @@ static int handle_file_event(void* ctx, void* data, size_t data_sz) {
 					.comm = {0}};
 
 	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
 
 	// Create JSON data
 	snprintf(ravn_event.data, sizeof(ravn_event.data),

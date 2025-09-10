@@ -26,7 +26,7 @@ struct {
 
 // Simple test function that generates security events
 SEC("kprobe/security_inode_create")
-int trace_security_event(struct pt_regs* ctx) {
+int trace_security_event(struct pt_regs* ctx __attribute__((unused))) {
 	struct security_event* event;
 
 	// Reserve space in ring buffer
