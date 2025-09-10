@@ -10,7 +10,7 @@ TabWidth: 8
 UseTab: Always
 ContinuationIndentWidth: 8
 
-# Line length (Linux kernel style)
+# Line length (Linux kernel style + 10 (:)) )
 ColumnLimit: 100
 
 # Braces (K&R style)
