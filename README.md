@@ -52,6 +52,20 @@ make all
 - **Professional Dashboard**: TUI interface with live updates
 - **High Performance**: <10ms inference, 100+ events/second
 
+## Docker Package
+
+RAVN is also available as a Docker container:
+
+```bash
+# Pull from GitHub Container Registry (private)
+docker pull ghcr.io/guy-davidi/ravn:latest
+
+# Run the container
+docker run -d --privileged ghcr.io/guy-davidi/ravn:latest
+```
+
+**Note**: The package is private and requires authentication to access.
+
 ## License
 
 GPL License - see LICENSE file for details.

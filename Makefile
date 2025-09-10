@@ -64,10 +64,11 @@ package:
 	@echo "[PACKAGE] Package built successfully: ravn:latest"
 
 package-push:
-	@echo "[PACKAGE] Pushing to GitHub Container Registry..."
+	@echo "[PACKAGE] Pushing to GitHub Container Registry (PRIVATE)..."
+	@echo "[PACKAGE] Note: Package will be private by default"
 	@docker tag ravn:latest ghcr.io/guy-davidi/ravn:latest
 	@docker push ghcr.io/guy-davidi/ravn:latest
-	@echo "[PACKAGE] Package pushed successfully"
+	@echo "[PACKAGE] Package pushed successfully to private registry"
 
 force-model:
 	@read -p "Force retrain model? [y/N]: " confirm; \
