@@ -1,0 +1,185 @@
+name: Build and Publish Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: 'Package version'
+        required: true
+        default: 'latest'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up environment
+      run: |
+        if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" =~ ^refs/tags/v(.+)$ ]]; then
+          VERSION="${BASH_REMATCH[1]}"
+        else
+          VERSION="${{ github.event.inputs.package_version || 'latest' }}"
+        fi
+        echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
+        echo "RAVN_BUILD_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
+        echo "RAVN_BUILD_TIME=$(date -u +'%H:%M:%S')" >> $GITHUB_ENV
+        echo "RAVN_COMMIT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          gcc \
+          clang \
+          make \
+          redis-server \
+          libbpf-dev \
+          libhiredis-dev \
+          python3 \
+          python3-pip \
+          python3-venv
+    
+    - name: Set up Python virtual environment
+      run: |
+        echo "Setting up Python virtual environment..."
+        python3 -m venv venv
+        source venv/bin/activate
+        
+        # Upgrade pip in virtual environment
+        pip install --upgrade pip
+        
+        # Install Python dependencies
+        pip install -r requirements.txt
+        
+        echo "Python virtual environment setup complete"
+    
+    - name: Start Redis server
+      run: |
+        sudo systemctl start redis-server
+        redis-cli ping || (sudo redis-server --daemonize yes && sleep 2)
+    
+    - name: Generate version information
+      run: |
+        # Create version header for C code
+        DATE_PART=$(echo $PACKAGE_VERSION | cut -d'.' -f1)
+        MAGIC_PART=$(echo $PACKAGE_VERSION | cut -d'.' -f2)
+        
+        # Handle 'latest' version
+        if [ "$PACKAGE_VERSION" = "latest" ]; then
+          CURRENT_DATE=$(date +%Y%m%d)
+          DATE_PART="$CURRENT_DATE"
+          MAGIC_PART="1"
+        fi
+        
+        YEAR=$(echo $DATE_PART | cut -c1-4)
+        MONTH=$(echo $DATE_PART | cut -c5-6)
+        DAY=$(echo $DATE_PART | cut -c7-8)
+        
+        # Remove leading zeros to avoid octal constant issues
+        YEAR_NUM=$((10#$YEAR))
+        MONTH_NUM=$((10#$MONTH))
+        DAY_NUM=$((10#$DAY))
+        MAGIC_NUM=$((10#$MAGIC_PART))
+        
+        cat > src/version.h << EOF
+        #ifndef RAVN_VERSION_H
+        #define RAVN_VERSION_H
+        
+        #define RAVN_VERSION_MAJOR $YEAR_NUM
+        #define RAVN_VERSION_MINOR $MONTH_NUM
+        #define RAVN_VERSION_PATCH $DAY_NUM
+        #define RAVN_VERSION_MAGIC $MAGIC_NUM
+        #define RAVN_VERSION_STRING "$PACKAGE_VERSION"
+        #define RAVN_BUILD_DATE "$RAVN_BUILD_DATE"
+        #define RAVN_BUILD_TIME "$RAVN_BUILD_TIME"
+        #define RAVN_COMMIT_SHA "$RAVN_COMMIT_SHA"
+        
+        #endif // RAVN_VERSION_H
+        EOF
+        
+        echo "Version header created for $PACKAGE_VERSION"
+    
+    - name: Build RAVN
+      run: |
+        echo "Building RAVN version $PACKAGE_VERSION"
+        source venv/bin/activate
+        
+        # Create codegen directory before build
+        mkdir -p src/daemon/codegen
+        
+        # Clean first, then generate version header
+        make clean-ci
+        make version-update
+        make all
+        
+        # Verify binary was created
+        if [ -f "artifacts/ravn" ]; then
+          echo "Build successful - Binary size: $(ls -lh artifacts/ravn | awk '{print $5}')"
+        else
+          echo "Build failed - Binary not found"
+          exit 1
+        fi
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=${{ env.PACKAGE_VERSION }}
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Package summary
+      if: always()
+      run: |
+        echo "## Package Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: $PACKAGE_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Date**: $RAVN_BUILD_DATE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit SHA**: $RAVN_COMMIT_SHA" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Registry**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "artifacts/ravn" ]; then
+          echo "- **Binary Size**: $(ls -lh artifacts/ravn | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+        fi

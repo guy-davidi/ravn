@@ -58,6 +58,17 @@ release-full:
 release-list:
 	@./scripts/release.sh list
 
+package:
+	@echo "[PACKAGE] Building Docker package..."
+	@docker build -t ravn:latest .
+	@echo "[PACKAGE] Package built successfully: ravn:latest"
+
+package-push:
+	@echo "[PACKAGE] Pushing to GitHub Container Registry..."
+	@docker tag ravn:latest ghcr.io/guy-davidi/ravn:latest
+	@docker push ghcr.io/guy-davidi/ravn:latest
+	@echo "[PACKAGE] Package pushed successfully"
+
 force-model:
 	@read -p "Force retrain model? [y/N]: " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
@@ -142,6 +153,8 @@ help:
 	@echo "  release-github - Trigger GitHub release"
 	@echo "  release-full   - Full release process (local + tag + github)"
 	@echo "  release-list   - List existing releases"
+	@echo "  package        - Build Docker package"
+	@echo "  package-push   - Push Docker package to GitHub Container Registry"
 	@echo "  format-check   - Check code formatting (Linux kernel style)"
 	@echo "  format-fix     - Apply code formatting to all files"
 	@echo "  format         - Alias for format-fix"
@@ -151,4 +164,4 @@ help:
 	@echo "  redis          - Start Redis server"
 	@echo "  help           - Show this help"
 
-.PHONY: all clean clean-ci clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list format-check format-fix format help
+.PHONY: all clean clean-ci clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list package package-push format-check format-fix format help
