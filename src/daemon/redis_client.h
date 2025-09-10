@@ -1,9 +1,9 @@
 /*
  * RAVN Redis Client - Header File
  *
- * This header defines the Redis client interface for the RAVN security platform,
- * providing high-performance data storage and real-time communication for
- * event handling, threat level management, and system monitoring.
+ * This header defines the Redis client interface for the RAVN security
+ * platform, providing high-performance data storage and real-time communication
+ * for event handling, threat level management, and system monitoring.
  *
  * Copyright (C) 2024 RAVN Security Platform
  * Author: RAVN Development Team
@@ -43,10 +43,10 @@ typedef struct redisContext redisContext;
  */
 typedef struct redis_connection redis_connection_t;
 struct redis_connection {
-	redisContext *context;		/* Redis context */
-	int connected;			/* Connection status */
-	char host[256];		/* Server hostname/IP */
-	int port;			/* Server port */
+	redisContext* context; /* Redis context */
+	int connected;	       /* Connection status */
+	char host[256];	       /* Server hostname/IP */
+	int port;	       /* Server port */
 };
 
 /* Include the full definition */
@@ -63,10 +63,10 @@ struct redis_connection {
  */
 typedef struct threat_level threat_level_t;
 struct threat_level {
-	uint64_t timestamp;		/* Assessment timestamp */
-	float score;			/* Threat score (0.0-1.0) */
-	int level;			/* Threat level classification */
-	char reason[256];		/* Assessment reason */
+	uint64_t timestamp; /* Assessment timestamp */
+	float score;	    /* Threat score (0.0-1.0) */
+	int level;	    /* Threat level classification */
+	char reason[256];   /* Assessment reason */
 };
 
 /*
@@ -79,10 +79,10 @@ struct threat_level {
  * Used throughout the system for consistent threat assessment
  */
 enum threat_level_enum {
-	THREAT_LOW = 0,		/* Normal system activity */
-	THREAT_MEDIUM = 1,	/* Suspicious activity detected */
-	THREAT_HIGH = 2,	/* High probability of attack */
-	THREAT_CRITICAL = 3	/* Critical threat confirmed */
+	THREAT_LOW = 0,	    /* Normal system activity */
+	THREAT_MEDIUM = 1,  /* Suspicious activity detected */
+	THREAT_HIGH = 2,    /* High probability of attack */
+	THREAT_CRITICAL = 3 /* Critical threat confirmed */
 };
 
 /*
@@ -99,7 +99,7 @@ enum threat_level_enum {
  *
  * Return: Connection handle on success, NULL on failure
  */
-redis_connection_t *redis_connect(const char *host, int port);
+redis_connection_t* redis_connect(const char* host, int port);
 
 /**
  * redis_disconnect - Disconnect from Redis server
@@ -108,7 +108,7 @@ redis_connection_t *redis_connect(const char *host, int port);
  * Closes the connection to the Redis server and frees associated resources.
  * This function is safe to call with NULL or already disconnected connections.
  */
-void redis_disconnect(redis_connection_t *conn);
+void redis_disconnect(redis_connection_t* conn);
 
 /**
  * redis_is_connected - Check connection status
@@ -118,7 +118,7 @@ void redis_disconnect(redis_connection_t *conn);
  *
  * Return: 1 if connected, 0 if disconnected
  */
-int redis_is_connected(redis_connection_t *conn);
+int redis_is_connected(redis_connection_t* conn);
 
 /*
  * Event Management Functions
@@ -134,7 +134,7 @@ int redis_is_connected(redis_connection_t *conn);
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_send_event(redis_connection_t *conn, const struct ravn_event *event);
+int redis_send_event(redis_connection_t* conn, const struct ravn_event* event);
 
 /**
  * redis_get_event - Get event from Redis
@@ -145,7 +145,7 @@ int redis_send_event(redis_connection_t *conn, const struct ravn_event *event);
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_get_event(redis_connection_t *conn, struct ravn_event *event);
+int redis_get_event(redis_connection_t* conn, struct ravn_event* event);
 
 /**
  * redis_subscribe_events - Subscribe to live event stream
@@ -157,7 +157,7 @@ int redis_get_event(redis_connection_t *conn, struct ravn_event *event);
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_subscribe_events(redis_connection_t *conn, void (*callback)(const struct ravn_event *));
+int redis_subscribe_events(redis_connection_t* conn, void (*callback)(const struct ravn_event*));
 
 /*
  * Threat Level Management Functions
@@ -173,7 +173,7 @@ int redis_subscribe_events(redis_connection_t *conn, void (*callback)(const stru
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_update_threat_level(redis_connection_t *conn, const threat_level_t *threat);
+int redis_update_threat_level(redis_connection_t* conn, const threat_level_t* threat);
 
 /**
  * redis_get_threat_level - Get current threat level from Redis
@@ -184,7 +184,7 @@ int redis_update_threat_level(redis_connection_t *conn, const threat_level_t *th
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_get_threat_level(redis_connection_t *conn, threat_level_t *threat);
+int redis_get_threat_level(redis_connection_t* conn, threat_level_t* threat);
 
 /**
  * redis_subscribe_threat_updates - Subscribe to threat level updates
@@ -196,7 +196,8 @@ int redis_get_threat_level(redis_connection_t *conn, threat_level_t *threat);
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_subscribe_threat_updates(redis_connection_t *conn, void (*callback)(const threat_level_t *));
+int redis_subscribe_threat_updates(redis_connection_t* conn,
+				   void (*callback)(const threat_level_t*));
 
 /*
  * Utility Functions
@@ -209,7 +210,7 @@ int redis_subscribe_threat_updates(redis_connection_t *conn, void (*callback)(co
  *
  * Return: Error message string, NULL if no error
  */
-char *redis_get_last_error(void);
+char* redis_get_last_error(void);
 
 /**
  * redis_ping - Ping Redis server
@@ -219,7 +220,7 @@ char *redis_get_last_error(void);
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_ping(redis_connection_t *conn);
+int redis_ping(redis_connection_t* conn);
 
 /**
  * redis_flush_all - Flush all Redis data
@@ -229,6 +230,6 @@ int redis_ping(redis_connection_t *conn);
  *
  * Return: 0 on success, -1 on failure
  */
-int redis_flush_all(redis_connection_t *conn);
+int redis_flush_all(redis_connection_t* conn);
 
 #endif // RAVN_REDIS_CLIENT_H

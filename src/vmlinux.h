@@ -36,55 +36,55 @@ typedef char comm[16];
 
 /* Kernel structures we need */
 struct task_struct {
-    int pid;
-    int tgid;
-    comm comm;
-    uid_t uid;
-    gid_t gid;
+	int pid;
+	int tgid;
+	comm comm;
+	uid_t uid;
+	gid_t gid;
 };
 
 struct file {
-    int f_flags;
-    mode_t f_mode;
+	int f_flags;
+	mode_t f_mode;
 };
 
 struct inode {
-    uid_t i_uid;
-    gid_t i_gid;
-    mode_t i_mode;
+	uid_t i_uid;
+	gid_t i_gid;
+	mode_t i_mode;
 };
 
 struct dentry {
-    char d_name[256];
+	char d_name[256];
 };
 
 struct path {
-    struct dentry *dentry;
-    struct inode *inode;
+	struct dentry* dentry;
+	struct inode* inode;
 };
 
 /* Network structures */
 struct sock {
-    __u16 sk_family;
-    __u16 sk_type;
-    __u16 sk_protocol;
+	__u16 sk_family;
+	__u16 sk_type;
+	__u16 sk_protocol;
 };
 
 struct socket {
-    struct sock *sk;
+	struct sock* sk;
 };
 
 /* Memory structures */
 struct vm_area_struct {
-    unsigned long vm_start;
-    unsigned long vm_end;
-    unsigned long vm_flags;
+	unsigned long vm_start;
+	unsigned long vm_end;
+	unsigned long vm_flags;
 };
 
 /* Time structures */
 struct timespec {
-    time_t tv_sec;
-    long tv_nsec;
+	time_t tv_sec;
+	long tv_nsec;
 };
 
 /* Network types */
@@ -97,7 +97,7 @@ typedef __u32 __wsum;
 
 /* BPF program types */
 #define BPF_PROG_TYPE_TRACEPOINT 6
-#define BPF_PROG_TYPE_KPROBE 2
+#define BPF_PROG_TYPE_KPROBE	 2
 
 /* BPF attach types */
 #define BPF_TRACE_RAW_TP 0
@@ -108,6 +108,6 @@ typedef __u32 __wsum;
 
 /* Common constants */
 #define MAX_FILENAME_LEN 256
-#define MAX_COMM_LEN 16
+#define MAX_COMM_LEN	 16
 
 #endif /* __VMLINUX_H__ */

@@ -1,9 +1,9 @@
 /*
  * RAVN LSTM Neural Network - Header File
  *
- * This header defines the LSTM neural network implementation for the RAVN security
- * platform, providing deep learning capabilities for threat detection and pattern
- * recognition in system event sequences.
+ * This header defines the LSTM neural network implementation for the RAVN
+ * security platform, providing deep learning capabilities for threat detection
+ * and pattern recognition in system event sequences.
  *
  * Copyright (C) 2024 RAVN Security Platform
  * Author: RAVN Development Team
@@ -37,21 +37,21 @@
 #ifndef RAVN_LSTM_H
 #define RAVN_LSTM_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /*
  * Model Architecture Constants
  * These constants define the neural network architecture and must match
  * the generated model weights from the training process.
  */
-#define INPUT_SEQUENCE_LENGTH 20	/* Maximum sequence length in timesteps */
-#define INPUT_FEATURE_DIM 64		/* Input feature dimension per timestep */
-#define DENSE1_OUTPUT_SIZE 64		/* First dense layer output size */
-#define LSTM1_HIDDEN_SIZE 128		/* First LSTM layer hidden size */
-#define LSTM2_HIDDEN_SIZE 64		/* Second LSTM layer hidden size */
-#define DENSE2_OUTPUT_SIZE 32		/* Second dense layer output size */
-#define OUTPUT_CLASSES 3		/* Number of output classes */
+#define INPUT_SEQUENCE_LENGTH 20  /* Maximum sequence length in timesteps */
+#define INPUT_FEATURE_DIM     64  /* Input feature dimension per timestep */
+#define DENSE1_OUTPUT_SIZE    64  /* First dense layer output size */
+#define LSTM1_HIDDEN_SIZE     128 /* First LSTM layer hidden size */
+#define LSTM2_HIDDEN_SIZE     64  /* Second LSTM layer hidden size */
+#define DENSE2_OUTPUT_SIZE    32  /* Second dense layer output size */
+#define OUTPUT_CLASSES	      3	  /* Number of output classes */
 
 /*
  * Model Classification Enums - Neural network output classifications
@@ -63,9 +63,9 @@
  * Used for threat detection and classification results
  */
 enum model_classification {
-	CLASS_NORMAL = 0,		/* Normal system activity */
-	CLASS_SUSPICIOUS = 1,		/* Suspicious activity detected */
-	CLASS_ATTACK = 2		/* Malicious activity confirmed */
+	CLASS_NORMAL = 0,     /* Normal system activity */
+	CLASS_SUSPICIOUS = 1, /* Suspicious activity detected */
+	CLASS_ATTACK = 2      /* Malicious activity confirmed */
 };
 
 /**
@@ -80,25 +80,25 @@ enum model_classification {
  * @hidden_size: Hidden state dimension
  * @initialized: Initialization status flag
  *
- * Represents a single LSTM cell with forget, input, candidate, and output gates.
- * Implements the standard LSTM equations for sequence processing.
+ * Represents a single LSTM cell with forget, input, candidate, and output
+ * gates. Implements the standard LSTM equations for sequence processing.
  */
 typedef struct {
 	/* Weight matrices (for input) */
-	float *W_f, *W_i, *W_c, *W_o;	/* Input weights */
-	float *U_f, *U_i, *U_c, *U_o;	/* Recurrent weights */
-	float *b_f, *b_i, *b_c, *b_o;	/* Bias vectors */
-	
+	float *W_f, *W_i, *W_c, *W_o; /* Input weights */
+	float *U_f, *U_i, *U_c, *U_o; /* Recurrent weights */
+	float *b_f, *b_i, *b_c, *b_o; /* Bias vectors */
+
 	/* State vectors */
-	float *h_prev, *c_prev;		/* Previous hidden and cell states */
-	float *h_curr, *c_curr;		/* Current hidden and cell states */
-	
+	float *h_prev, *c_prev; /* Previous hidden and cell states */
+	float *h_curr, *c_curr; /* Current hidden and cell states */
+
 	/* Gate vectors (temporary storage) */
 	float *f_gate, *i_gate, *c_candidate, *o_gate;
-	
-	int input_size;			/* Input feature dimension */
-	int hidden_size;		/* Hidden state dimension */
-	int initialized;		/* Initialization flag */
+
+	int input_size;	 /* Input feature dimension */
+	int hidden_size; /* Hidden state dimension */
+	int initialized; /* Initialization flag */
 } lstm_cell_t;
 
 /**
@@ -113,11 +113,11 @@ typedef struct {
  * Performs linear transformation followed by activation function.
  */
 typedef struct {
-	float *weights;		/* Weight matrix */
-	float *bias;		/* Bias vector */
-	int input_size;		/* Input dimension */
-	int output_size;	/* Output dimension */
-	int initialized;	/* Initialization flag */
+	float* weights;	 /* Weight matrix */
+	float* bias;	 /* Bias vector */
+	int input_size;	 /* Input dimension */
+	int output_size; /* Output dimension */
+	int initialized; /* Initialization flag */
 } dense_layer_t;
 
 /**
@@ -132,7 +132,8 @@ typedef struct {
  * @lstm2_output: LSTM2 output buffer [LSTM2_HIDDEN_SIZE]
  * @dense2_output: Dense2 output buffer [DENSE2_OUTPUT_SIZE]
  * @final_output: Final output buffer [OUTPUT_CLASSES]
- * @sequence_buffer: Sequence processing buffer [INPUT_SEQUENCE_LENGTH * DENSE1_OUTPUT_SIZE]
+ * @sequence_buffer: Sequence processing buffer [INPUT_SEQUENCE_LENGTH *
+ * DENSE1_OUTPUT_SIZE]
  * @initialized: Model initialization status flag
  *
  * Complete neural network model combining dense and LSTM layers for
@@ -141,23 +142,23 @@ typedef struct {
  */
 typedef struct {
 	/* Neural network layers */
-	dense_layer_t dense1;		/* Dense layer 1: 1280 -> 64 */
-	lstm_cell_t lstm1;		/* LSTM layer 1: 64 -> 128 */
-	lstm_cell_t lstm2;		/* LSTM layer 2: 128 -> 64 */
-	dense_layer_t dense2;		/* Dense layer 2: 64 -> 32 */
-	dense_layer_t dense3;		/* Dense layer 3: 32 -> 3 */
-	
+	dense_layer_t dense1; /* Dense layer 1: 1280 -> 64 */
+	lstm_cell_t lstm1;    /* LSTM layer 1: 64 -> 128 */
+	lstm_cell_t lstm2;    /* LSTM layer 2: 128 -> 64 */
+	dense_layer_t dense2; /* Dense layer 2: 64 -> 32 */
+	dense_layer_t dense3; /* Dense layer 3: 32 -> 3 */
+
 	/* Working buffers for forward propagation */
-	float *dense1_output;		/* Dense1 output buffer */
-	float *lstm1_output;		/* LSTM1 output buffer */
-	float *lstm2_output;		/* LSTM2 output buffer */
-	float *dense2_output;		/* Dense2 output buffer */
-	float *final_output;		/* Final output buffer */
-	
+	float* dense1_output; /* Dense1 output buffer */
+	float* lstm1_output;  /* LSTM1 output buffer */
+	float* lstm2_output;  /* LSTM2 output buffer */
+	float* dense2_output; /* Dense2 output buffer */
+	float* final_output;  /* Final output buffer */
+
 	/* Sequence processing buffer */
-	float *sequence_buffer;		/* Sequence processing buffer */
-	
-	int initialized;		/* Model initialization flag */
+	float* sequence_buffer; /* Sequence processing buffer */
+
+	int initialized; /* Model initialization flag */
 } ravn_model_t;
 
 /*
@@ -207,7 +208,7 @@ float relu(float x);
  *
  * Return: Softmax output at given index
  */
-float softmax(float *x, int size, int index);
+float softmax(float* x, int size, int index);
 
 /*
  * LSTM Cell Functions
@@ -222,7 +223,7 @@ float softmax(float *x, int size, int index);
  *
  * Return: Pointer to new LSTM cell, NULL on failure
  */
-lstm_cell_t *lstm_cell_create(int input_size, int hidden_size);
+lstm_cell_t* lstm_cell_create(int input_size, int hidden_size);
 
 /**
  * lstm_cell_init - Initialize LSTM cell
@@ -234,7 +235,7 @@ lstm_cell_t *lstm_cell_create(int input_size, int hidden_size);
  *
  * Return: 0 on success, -1 on failure
  */
-int lstm_cell_init(lstm_cell_t *cell, int input_size, int hidden_size);
+int lstm_cell_init(lstm_cell_t* cell, int input_size, int hidden_size);
 
 /**
  * lstm_cell_destroy - Destroy LSTM cell
@@ -242,7 +243,7 @@ int lstm_cell_init(lstm_cell_t *cell, int input_size, int hidden_size);
  *
  * Frees all memory associated with the LSTM cell.
  */
-void lstm_cell_destroy(lstm_cell_t *cell);
+void lstm_cell_destroy(lstm_cell_t* cell);
 
 /**
  * lstm_cell_forward - Forward propagation through LSTM cell
@@ -254,7 +255,7 @@ void lstm_cell_destroy(lstm_cell_t *cell);
  *
  * Return: 0 on success, -1 on failure
  */
-int lstm_cell_forward(lstm_cell_t *cell, const float *input);
+int lstm_cell_forward(lstm_cell_t* cell, const float* input);
 
 /**
  * lstm_cell_reset_state - Reset LSTM cell state
@@ -262,7 +263,7 @@ int lstm_cell_forward(lstm_cell_t *cell, const float *input);
  *
  * Resets the hidden and cell states to zero for new sequence processing.
  */
-void lstm_cell_reset_state(lstm_cell_t *cell);
+void lstm_cell_reset_state(lstm_cell_t* cell);
 
 /*
  * Dense Layer Functions
@@ -277,7 +278,7 @@ void lstm_cell_reset_state(lstm_cell_t *cell);
  *
  * Return: Pointer to new dense layer, NULL on failure
  */
-dense_layer_t *dense_layer_create(int input_size, int output_size);
+dense_layer_t* dense_layer_create(int input_size, int output_size);
 
 /**
  * dense_layer_init - Initialize dense layer
@@ -289,7 +290,7 @@ dense_layer_t *dense_layer_create(int input_size, int output_size);
  *
  * Return: 0 on success, -1 on failure
  */
-int dense_layer_init(dense_layer_t *layer, int input_size, int output_size);
+int dense_layer_init(dense_layer_t* layer, int input_size, int output_size);
 
 /**
  * dense_layer_destroy - Destroy dense layer
@@ -297,7 +298,7 @@ int dense_layer_init(dense_layer_t *layer, int input_size, int output_size);
  *
  * Frees all memory associated with the dense layer.
  */
-void dense_layer_destroy(dense_layer_t *layer);
+void dense_layer_destroy(dense_layer_t* layer);
 
 /**
  * dense_layer_forward - Forward propagation through dense layer
@@ -309,7 +310,7 @@ void dense_layer_destroy(dense_layer_t *layer);
  *
  * Return: 0 on success, -1 on failure
  */
-int dense_layer_forward(dense_layer_t *layer, const float *input, float *output);
+int dense_layer_forward(dense_layer_t* layer, const float* input, float* output);
 
 /*
  * Model Functions
@@ -322,7 +323,7 @@ int dense_layer_forward(dense_layer_t *layer, const float *input, float *output)
  *
  * Return: Pointer to new model, NULL on failure
  */
-ravn_model_t *ravn_model_create(void);
+ravn_model_t* ravn_model_create(void);
 
 /**
  * ravn_model_init - Initialize RAVN model
@@ -332,7 +333,7 @@ ravn_model_t *ravn_model_create(void);
  *
  * Return: 0 on success, -1 on failure
  */
-int ravn_model_init(ravn_model_t *model);
+int ravn_model_init(ravn_model_t* model);
 
 /**
  * ravn_model_destroy - Destroy RAVN model
@@ -340,7 +341,7 @@ int ravn_model_init(ravn_model_t *model);
  *
  * Frees all memory associated with the RAVN model.
  */
-void ravn_model_destroy(ravn_model_t *model);
+void ravn_model_destroy(ravn_model_t* model);
 
 /*
  * Prediction Functions
@@ -357,7 +358,7 @@ void ravn_model_destroy(ravn_model_t *model);
  *
  * Return: Threat score (0.0 to 1.0), -1.0 on error
  */
-float ravn_model_predict(ravn_model_t *model, const float *sequence, size_t sequence_length);
+float ravn_model_predict(ravn_model_t* model, const float* sequence, size_t sequence_length);
 
 /**
  * ravn_model_predict_class - Predict threat class
@@ -369,7 +370,7 @@ float ravn_model_predict(ravn_model_t *model, const float *sequence, size_t sequ
  *
  * Return: Class ID (0=Normal, 1=Suspicious, 2=Attack), -1 on error
  */
-int ravn_model_predict_class(ravn_model_t *model, const float *sequence, size_t sequence_length);
+int ravn_model_predict_class(ravn_model_t* model, const float* sequence, size_t sequence_length);
 
 /*
  * Weight Loading Functions
@@ -384,7 +385,7 @@ int ravn_model_predict_class(ravn_model_t *model, const float *sequence, size_t 
  *
  * Return: 0 on success, -1 on failure
  */
-int ravn_model_load_weights(ravn_model_t *model, const float *all_weights);
+int ravn_model_load_weights(ravn_model_t* model, const float* all_weights);
 
 /*
  * Utility Functions
@@ -398,7 +399,8 @@ int ravn_model_load_weights(ravn_model_t *model, const float *all_weights);
  *
  * Preprocesses the input sequence for model consumption (normalization, etc.).
  */
-void ravn_model_preprocess_sequence(const float *raw_sequence, float *processed_sequence, size_t length);
+void ravn_model_preprocess_sequence(const float* raw_sequence, float* processed_sequence,
+				    size_t length);
 
 /**
  * ravn_model_class_name - Get class name
@@ -408,16 +410,16 @@ void ravn_model_preprocess_sequence(const float *raw_sequence, float *processed_
  *
  * Return: Class name string, "UNKNOWN" if invalid
  */
-const char *ravn_model_class_name(int class_id);
+const char* ravn_model_class_name(int class_id);
 
 // Legacy compatibility (for existing code)
 typedef ravn_model_t ravn_rnn_lstm_model_t;
-#define ravn_rnn_lstm_create ravn_model_create
-#define ravn_rnn_lstm_init ravn_model_init
-#define ravn_rnn_lstm_destroy ravn_model_destroy
-#define ravn_rnn_lstm_predict ravn_model_predict
+#define ravn_rnn_lstm_create	    ravn_model_create
+#define ravn_rnn_lstm_init	    ravn_model_init
+#define ravn_rnn_lstm_destroy	    ravn_model_destroy
+#define ravn_rnn_lstm_predict	    ravn_model_predict
 #define ravn_rnn_lstm_predict_class ravn_model_predict_class
-#define ravn_rnn_lstm_load_weights ravn_model_load_weights
-#define ravn_rnn_lstm_class_name ravn_model_class_name
+#define ravn_rnn_lstm_load_weights  ravn_model_load_weights
+#define ravn_rnn_lstm_class_name    ravn_model_class_name
 
 #endif // RAVN_LSTM_H

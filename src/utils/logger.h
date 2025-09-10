@@ -27,11 +27,11 @@
 #ifndef RAVN_LOGGER_H
 #define RAVN_LOGGER_H
 
-#include <stdio.h>
-#include <time.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 
 /**
  * enum log_level_t - Log level enumeration
@@ -45,11 +45,11 @@
  * Messages below the configured level are not output.
  */
 typedef enum {
-	LOG_LEVEL_DEBUG = 0,	/* Debug messages */
-	LOG_LEVEL_INFO,		/* Informational messages */
-	LOG_LEVEL_WARN,		/* Warning messages */
-	LOG_LEVEL_ERROR,	/* Error messages */
-	LOG_LEVEL_FATAL		/* Fatal error messages */
+	LOG_LEVEL_DEBUG = 0, /* Debug messages */
+	LOG_LEVEL_INFO,	     /* Informational messages */
+	LOG_LEVEL_WARN,	     /* Warning messages */
+	LOG_LEVEL_ERROR,     /* Error messages */
+	LOG_LEVEL_FATAL	     /* Fatal error messages */
 } log_level_t;
 
 /**
@@ -64,12 +64,12 @@ typedef enum {
  * Configuration structure for the logging system.
  */
 typedef struct {
-	log_level_t level;		/* Minimum log level */
-	int use_colors;			/* Color output flag */
-	int use_timestamps;		/* Timestamp flag */
-	int use_thread_id;		/* Thread ID flag */
-	FILE *output_file;		/* Output file handle */
-	char *log_file_path;		/* Log file path */
+	log_level_t level;   /* Minimum log level */
+	int use_colors;	     /* Color output flag */
+	int use_timestamps;  /* Timestamp flag */
+	int use_thread_id;   /* Thread ID flag */
+	FILE* output_file;   /* Output file handle */
+	char* log_file_path; /* Log file path */
 } logger_config_t;
 
 /*
@@ -86,7 +86,7 @@ typedef struct {
  *
  * Return: 0 on success, -1 on failure
  */
-int logger_init(log_level_t level, const char *log_file);
+int logger_init(log_level_t level, const char* log_file);
 
 /**
  * logger_set_level - Set minimum log level
@@ -103,7 +103,7 @@ void logger_set_level(log_level_t level);
  *
  * Changes the output destination for log messages.
  */
-void logger_set_file(const char *file_path);
+void logger_set_file(const char* file_path);
 
 /**
  * logger_set_colors - Enable/disable color output
@@ -145,7 +145,8 @@ void logger_set_thread_id(int enable);
  * Core logging function that formats and outputs a log message.
  * This function is thread-safe and handles all formatting.
  */
-void logger_log(log_level_t level, const char *file, int line, const char *func, const char *format, ...);
+void logger_log(log_level_t level, const char* file, int line, const char* func, const char* format,
+		...);
 
 /**
  * logger_log_with_module - Log a message with module context
@@ -159,7 +160,8 @@ void logger_log(log_level_t level, const char *file, int line, const char *func,
  *
  * Logs a message with additional module context for better organization.
  */
-void logger_log_with_module(log_level_t level, const char *module, const char *file, int line, const char *func, const char *format, ...);
+void logger_log_with_module(log_level_t level, const char* module, const char* file, int line,
+			    const char* func, const char* format, ...);
 
 /*
  * Convenience Logging Macros
@@ -182,16 +184,21 @@ void logger_log_with_module(log_level_t level, const char *module, const char *f
  * These macros include module context for better log organization.
  */
 
-#define LOG_DEBUG_MODULE(module, format, ...) \
-	logger_log_with_module(LOG_LEVEL_DEBUG, module, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
-#define LOG_INFO_MODULE(module, format, ...) \
-	logger_log_with_module(LOG_LEVEL_INFO, module, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
-#define LOG_WARN_MODULE(module, format, ...) \
-	logger_log_with_module(LOG_LEVEL_WARN, module, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
-#define LOG_ERROR_MODULE(module, format, ...) \
-	logger_log_with_module(LOG_LEVEL_ERROR, module, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
-#define LOG_FATAL_MODULE(module, format, ...) \
-	logger_log_with_module(LOG_LEVEL_FATAL, module, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
+#define LOG_DEBUG_MODULE(module, format, ...)                                                 \
+	logger_log_with_module(LOG_LEVEL_DEBUG, module, __FILE__, __LINE__, __func__, format, \
+			       ##__VA_ARGS__)
+#define LOG_INFO_MODULE(module, format, ...)                                                 \
+	logger_log_with_module(LOG_LEVEL_INFO, module, __FILE__, __LINE__, __func__, format, \
+			       ##__VA_ARGS__)
+#define LOG_WARN_MODULE(module, format, ...)                                                 \
+	logger_log_with_module(LOG_LEVEL_WARN, module, __FILE__, __LINE__, __func__, format, \
+			       ##__VA_ARGS__)
+#define LOG_ERROR_MODULE(module, format, ...)                                                 \
+	logger_log_with_module(LOG_LEVEL_ERROR, module, __FILE__, __LINE__, __func__, format, \
+			       ##__VA_ARGS__)
+#define LOG_FATAL_MODULE(module, format, ...)                                                 \
+	logger_log_with_module(LOG_LEVEL_FATAL, module, __FILE__, __LINE__, __func__, format, \
+			       ##__VA_ARGS__)
 
 /*
  * Utility Functions
@@ -213,6 +220,6 @@ void logger_cleanup(void);
  *
  * Return: Log level name string, "UNKNOWN" if invalid
  */
-const char *logger_level_name(log_level_t level);
+const char* logger_level_name(log_level_t level);
 
 #endif // RAVN_LOGGER_H
