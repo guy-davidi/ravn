@@ -116,6 +116,16 @@ redis:
 	@echo "[REDIS] Starting Redis..."
 	sudo systemctl start redis-server
 
+format-check:
+	@echo "[FORMAT] Checking code formatting..."
+	@./scripts/format_code.sh --check
+
+format-fix:
+	@echo "[FORMAT] Applying code formatting..."
+	@./scripts/format_code.sh --fix
+
+format: format-fix
+
 help:
 	@echo "RAVN Security Platform"
 	@echo "Targets:"
@@ -131,10 +141,13 @@ help:
 	@echo "  release-github - Trigger GitHub release"
 	@echo "  release-full   - Full release process (local + tag + github)"
 	@echo "  release-list   - List existing releases"
+	@echo "  format-check   - Check code formatting (Linux kernel style)"
+	@echo "  format-fix     - Apply code formatting to all files"
+	@echo "  format         - Alias for format-fix"
 	@echo "  clean          - Clean build artifacts (interactive)"
 	@echo "  clean-ci       - Clean build artifacts (non-interactive for CI)"
 	@echo "  clean-all      - Force clean everything"
 	@echo "  redis          - Start Redis server"
 	@echo "  help           - Show this help"
 
-.PHONY: all clean clean-ci clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list help
+.PHONY: all clean clean-ci clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list format-check format-fix format help
