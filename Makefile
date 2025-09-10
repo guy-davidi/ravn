@@ -7,6 +7,7 @@ SRC_DIR = src
 ARTIFACTS_DIR = artifacts
 RAVN = $(ARTIFACTS_DIR)/ravn
 MODEL_HEADER = $(SRC_DIR)/daemon/codegen/model_weights.h
+VERSION_HEADER = $(SRC_DIR)/version.h
 NETWORK_HASH_FILE = $(ARTIFACTS_DIR)/.network_hash
 
 C_SOURCES = $(SRC_DIR)/main.c $(SRC_DIR)/daemon/ebpf_handler.c $(SRC_DIR)/daemon/redis_client.c \
@@ -15,16 +16,32 @@ OBJECTS = $(C_SOURCES:$(SRC_DIR)/%.c=$(ARTIFACTS_DIR)/%.o)
 EBPF_OBJECTS = $(ARTIFACTS_DIR)/syscall_monitor.bpf.o $(ARTIFACTS_DIR)/network_monitor.bpf.o \
                $(ARTIFACTS_DIR)/security_monitor.bpf.o $(ARTIFACTS_DIR)/file_monitor.bpf.o
 
-all: $(MODEL_HEADER) $(RAVN)
+all: $(VERSION_HEADER) $(MODEL_HEADER) $(RAVN)
 
 $(ARTIFACTS_DIR):
 	@mkdir -p $@
+
+$(VERSION_HEADER):
+	@echo "[VERSION] Generating version information..."
+	@./scripts/version.sh update
 
 $(MODEL_HEADER):
 	@echo "[MODEL] Generating AI model..."
 	@chmod +x scripts/ai/build_model.sh && cd scripts/ai && ./build_model.sh
 
 model: $(MODEL_HEADER)
+
+version:
+	@./scripts/version.sh show
+
+version-update:
+	@./scripts/version.sh update
+
+version-force:
+	@./scripts/version.sh force
+
+version-reset:
+	@./scripts/version.sh reset
 
 force-model:
 	@read -p "Force retrain model? [y/N]: " confirm; \
@@ -69,6 +86,17 @@ redis:
 
 help:
 	@echo "RAVN Security Platform"
-	@echo "Targets: all, model, force-model, clean, clean-all, redis, help"
+	@echo "Targets:"
+	@echo "  all            - Build RAVN with version and model"
+	@echo "  model          - Train AI model"
+	@echo "  force-model    - Force retrain AI model"
+	@echo "  version        - Show current version"
+	@echo "  version-update - Update version (if changes detected)"
+	@echo "  version-force  - Force version update"
+	@echo "  version-reset  - Reset version to current date.1"
+	@echo "  clean          - Clean build artifacts"
+	@echo "  clean-all      - Force clean everything"
+	@echo "  redis          - Start Redis server"
+	@echo "  help           - Show this help"
 
-.PHONY: all clean clean-all redis model force-model help
+.PHONY: all clean clean-all redis model force-model version version-update version-force version-reset help

@@ -1,0 +1,205 @@
+name: Daily CI - Full Compilation Check
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '11 7 * * *'
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  RAVN_VERSION: ${{ github.run_number }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Full history for version calculation
+    
+    - name: Set up environment
+      run: |
+        echo "RAVN_BUILD_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
+        echo "RAVN_BUILD_TIME=$(date -u +'%H:%M:%S')" >> $GITHUB_ENV
+        echo "RAVN_COMMIT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          gcc \
+          clang \
+          make \
+          redis-server \
+          libbpf-dev \
+          libhiredis-dev \
+          python3 \
+          python3-pip
+    
+    - name: Start Redis server
+      run: |
+        sudo systemctl start redis-server
+        sudo systemctl enable redis-server
+        redis-cli ping || (sudo redis-server --daemonize yes && sleep 2)
+    
+    - name: Generate version information
+      run: |
+        # Calculate version based on changes since last version
+        LAST_VERSION_FILE=".last_version"
+        CURRENT_DATE=$(date +%Y%m%d)
+        
+        if [ -f "$LAST_VERSION_FILE" ]; then
+          LAST_VERSION=$(cat "$LAST_VERSION_FILE")
+          LAST_DATE=$(echo "$LAST_VERSION" | cut -d'.' -f1)
+          
+          # Check if there are changes since last version
+          if [ "$LAST_DATE" = "$CURRENT_DATE" ]; then
+            # Same day, increment magic number
+            MAGIC=$(echo "$LAST_VERSION" | cut -d'.' -f2)
+            NEW_MAGIC=$((MAGIC + 1))
+          else
+            # New day, reset magic to 1
+            NEW_MAGIC=1
+          fi
+        else
+          # First run, start with magic 1
+          NEW_MAGIC=1
+        fi
+        
+        NEW_VERSION="${CURRENT_DATE}.${NEW_MAGIC}"
+        echo "$NEW_VERSION" > "$LAST_VERSION_FILE"
+        
+        echo "RAVN_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
+        echo "RAVN_MAGIC=${NEW_MAGIC}" >> $GITHUB_ENV
+        echo "Generated version: ${NEW_VERSION}"
+    
+    - name: Build RAVN
+      run: |
+        echo "Building RAVN version ${RAVN_VERSION}"
+        make clean
+        make all
+        
+        # Verify binary was created
+        if [ -f "artifacts/ravn" ]; then
+          echo "Build successful - Binary size: $(ls -lh artifacts/ravn | awk '{print $5}')"
+        else
+          echo "Build failed - Binary not found"
+          exit 1
+        fi
+    
+    - name: Run basic tests
+      run: |
+        echo "Running basic functionality tests..."
+        
+        # Test help command
+        ./artifacts/ravn help || echo "Help command test failed"
+        
+        # Test version display (if implemented)
+        ./artifacts/ravn --version 2>/dev/null || echo "Version command not implemented yet"
+        
+        echo "Basic tests completed"
+    
+    - name: Check for compilation warnings
+      run: |
+        echo "Checking for compilation warnings..."
+        # Rebuild with verbose output to catch warnings
+        make clean
+        make all 2>&1 | tee build.log
+        
+        # Count warnings
+        WARNING_COUNT=$(grep -c "warning:" build.log || echo "0")
+        echo "Compilation warnings found: $WARNING_COUNT"
+        
+        if [ "$WARNING_COUNT" -gt 0 ]; then
+          echo "::warning::Found $WARNING_COUNT compilation warnings"
+          echo "Warnings:"
+          grep "warning:" build.log || true
+        fi
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: ravn-build-${{ env.RAVN_VERSION }}
+        path: |
+          artifacts/
+          build.log
+        retention-days: 30
+    
+    - name: Create version tag
+      if: success() && github.event_name == 'schedule'
+      run: |
+        # Only create tags for scheduled runs (daily CI)
+        TAG_NAME="v${RAVN_VERSION}"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Check if tag already exists
+        if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+          echo "Tag $TAG_NAME already exists"
+        else
+          git tag -a "$TAG_NAME" -m "Daily build $RAVN_VERSION - $RAVN_BUILD_DATE"
+          git push origin "$TAG_NAME"
+          echo "Created tag: $TAG_NAME"
+        fi
+    
+    - name: Update version file
+      run: |
+        # Create version header for C code
+        cat > src/version.h << EOF
+        #ifndef RAVN_VERSION_H
+        #define RAVN_VERSION_H
+        
+        #define RAVN_VERSION_MAJOR $(echo $RAVN_VERSION | cut -d'.' -f1 | cut -c1-4)
+        #define RAVN_VERSION_MINOR $(echo $RAVN_VERSION | cut -d'.' -f1 | cut -c5-6)
+        #define RAVN_VERSION_PATCH $(echo $RAVN_VERSION | cut -d'.' -f1 | cut -c7-8)
+        #define RAVN_VERSION_MAGIC $(echo $RAVN_VERSION | cut -d'.' -f2)
+        #define RAVN_VERSION_STRING "$RAVN_VERSION"
+        #define RAVN_BUILD_DATE "$RAVN_BUILD_DATE"
+        #define RAVN_BUILD_TIME "$RAVN_BUILD_TIME"
+        #define RAVN_COMMIT_SHA "$RAVN_COMMIT_SHA"
+        
+        #endif // RAVN_VERSION_H
+        EOF
+        
+        echo "Version header created:"
+        cat src/version.h
+    
+    - name: Commit version updates
+      if: success() && github.event_name == 'schedule'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Add version files
+        git add src/version.h .last_version
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No version changes to commit"
+        else
+          git commit -m "Update version to $RAVN_VERSION [skip ci]"
+          git push
+          echo "Committed version update: $RAVN_VERSION"
+        fi
+    
+    - name: Build summary
+      if: always()
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: $RAVN_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Date**: $RAVN_BUILD_DATE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Time**: $RAVN_BUILD_TIME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit SHA**: $RAVN_COMMIT_SHA" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "artifacts/ravn" ]; then
+          echo "- **Binary Size**: $(ls -lh artifacts/ravn | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+        fi

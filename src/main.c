@@ -35,6 +35,7 @@
 #include "daemon/redis_client.h"
 #include "daemon/ai_engine.h"
 #include "utils/logger.h"
+#include "version.h"
 
 /*
  * Global state variables for daemon lifecycle management
@@ -453,9 +454,14 @@ void print_usage(const char *progname)
  */
 void print_version(void)
 {
-    printf("RAVN Security Platform v1.0.0\n");
+    printf("RAVN Security Platform v%s\n", RAVN_VERSION_STRING);
+    printf("Build Date: %s %s\n", RAVN_BUILD_DATE, RAVN_BUILD_TIME);
+    printf("Commit SHA: %s\n", RAVN_COMMIT_SHA);
     printf("eBPF-based Real-time Threat Detection\n");
     printf("Built with C, libbpf, Redis, and AI\n");
+    printf("Version Format: YYYYMMDD.MAGIC\n");
+    printf("  - Date: %04d-%02d-%02d\n", RAVN_VERSION_MAJOR, RAVN_VERSION_MINOR, RAVN_VERSION_PATCH);
+    printf("  - Magic: %d\n", RAVN_VERSION_MAGIC);
 }
 
 /**

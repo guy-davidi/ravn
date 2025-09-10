@@ -1,2 +1,51 @@
 # Build artifacts
 artifacts/
+*.o
+*.so
+*.a
+
+# Version files (generated)
+src/version.h
+.last_version
+
+# Model files (generated)
+src/daemon/codegen/model_weights.h
+artifacts/ravn_model.h5*
+artifacts/training_history.png
+artifacts/training_data.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+build.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Redis dump
+dump.rdb
+
+# Coverage reports
+coverage/
+*.gcov
+*.gcda
+*.gcno
