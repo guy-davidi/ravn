@@ -134,6 +134,10 @@ jobs:
       run: |
         echo "Building RAVN version $RAVN_VERSION"
         source venv/bin/activate
+        
+        # Create codegen directory before build
+        mkdir -p src/daemon/codegen
+        
         make clean-ci
         make all
         
