@@ -217,6 +217,9 @@ int run_daemon_mode(void)
                 LOG_INFO_MODULE("MAIN", "Failed to reconnect to Redis");
                 break;
             }
+            // Update global Redis connection pointer for eBPF handler
+            global_redis_conn_ptr = redis_conn;
+            LOG_INFO_MODULE("MAIN", "✓ Redis reconnection successful, global pointer updated");
         }
         
         // Sleep for a longer interval since real events are handled by eBPF thread

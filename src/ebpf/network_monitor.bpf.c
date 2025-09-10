@@ -29,9 +29,21 @@ struct {
     __uint(max_entries, 256 * 1024);
 } network_events SEC(".maps");
 
-// Simple test function that generates network events
+// Rate-limited network event generation
+static __u64 last_event_time = 0;
+static const __u64 EVENT_INTERVAL_NS = 1000000000; // 1 second
+
+// Simple test function that generates network events (rate limited)
 SEC("kprobe/tcp_sendmsg")
 int trace_network_send(struct pt_regs *ctx) {
+    __u64 current_time = bpf_ktime_get_ns();
+    
+    // Rate limit: only generate one event per second
+    if (current_time - last_event_time < EVENT_INTERVAL_NS) {
+        return 0;
+    }
+    last_event_time = current_time;
+    
     struct network_event *event;
     
     // Reserve space in ring buffer
@@ -41,7 +53,7 @@ int trace_network_send(struct pt_regs *ctx) {
     }
     
     // Fill event data
-    event->timestamp = bpf_ktime_get_ns();
+    event->timestamp = current_time;
     event->pid = bpf_get_current_pid_tgid() >> 32;
     event->tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
     event->event_type = 1; // Network send
