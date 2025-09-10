@@ -3,7 +3,7 @@ name: Daily CI - Full Compilation Check
 on:
   schedule:
     # Run daily at 2 AM UTC
-    - cron: '11 7 * * *'
+    - cron: '15 7 * * *'
   workflow_dispatch: # Allow manual trigger
   push:
     branches: [ main, master ]
