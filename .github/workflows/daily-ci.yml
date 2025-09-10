@@ -69,7 +69,7 @@ jobs:
     
     - name: Generate version information
       run: |
-        # Calculate version based on changes since last version
+        # Always increment version daily, regardless of changes
         LAST_VERSION_FILE=".last_version"
         CURRENT_DATE=$(date +%Y%m%d)
         
@@ -77,13 +77,12 @@ jobs:
           LAST_VERSION=$(cat "$LAST_VERSION_FILE")
           LAST_DATE=$(echo "$LAST_VERSION" | cut -d'.' -f1)
           
-          # Check if there are changes since last version
           if [ "$LAST_DATE" = "$CURRENT_DATE" ]; then
-            # Same day, increment magic number
+            # Same day, increment magic number (multiple runs per day)
             MAGIC=$(echo "$LAST_VERSION" | cut -d'.' -f2)
             NEW_MAGIC=$((MAGIC + 1))
           else
-            # New day, reset magic to 1
+            # New day, reset magic to 1 (daily increment)
             NEW_MAGIC=1
           fi
         else
@@ -96,7 +95,7 @@ jobs:
         
         echo "RAVN_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
         echo "RAVN_MAGIC=${NEW_MAGIC}" >> $GITHUB_ENV
-        echo "Generated version: ${NEW_VERSION}"
+        echo "Generated version: ${NEW_VERSION} (daily increment)"
         
         # Create version header for C code (CRITICAL: Must be done before build)
         DATE_PART=$(echo $NEW_VERSION | cut -d'.' -f1)
@@ -139,9 +138,9 @@ jobs:
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
         
-        # Clean first, then generate version header
+        # Clean first, then generate version header (force daily increment)
         make clean-ci
-        make version-update
+        make version-force
         make all
         
         # Verify binary was created
@@ -172,9 +171,9 @@ jobs:
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
         
-        # Rebuild with verbose output to catch warnings
+        # Rebuild with verbose output to catch warnings (force daily increment)
         make clean-ci
-        make version-update
+        make version-force
         make all 2>&1 | tee build.log
         
         # Count warnings
