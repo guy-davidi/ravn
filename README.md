@@ -5,6 +5,9 @@ Real-time security monitoring with eBPF and AI threat detection.
 ## Quick Start
 
 ```bash
+# Setup Python environment
+./setup.sh
+
 # Build
 make all
 

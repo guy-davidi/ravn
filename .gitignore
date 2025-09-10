@@ -22,6 +22,11 @@ __pycache__/
 .Python
 *.egg-info/
 
+# Virtual environments
+venv/
+env/
+ENV/
+
 # IDE files
 .vscode/
 .idea/

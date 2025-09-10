@@ -75,6 +75,19 @@ create_local_release() {
     
     # Build the project
     print_status "Building project..."
+    
+    # Set up virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        print_status "Creating Python virtual environment..."
+        python3 -m venv venv
+    fi
+    
+    # Activate virtual environment and install dependencies
+    print_status "Setting up Python dependencies..."
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    
     make clean-ci
     make all
     
