@@ -100,9 +100,12 @@ static int handle_network_event(void *ctx, void *data, size_t data_sz) {
     
     // Create JSON data
     snprintf(ravn_event.data, sizeof(ravn_event.data),
-        "{\"event_type\":\"%s\",\"family\":%u,\"type\":%u,\"protocol\":%u,\"local_port\":%u,\"remote_port\":%u,\"real_ebpf\":true}",
+        "{\"event_type\":\"%s\",\"family\":%u,\"type\":%u,\"protocol\":%u,\"src_ip\":\"%u.%u.%u.%u\",\"dst_ip\":\"%u.%u.%u.%u\",\"src_port\":%u,\"dst_port\":%u,\"bytes_sent\":%u,\"bytes_received\":%u,\"real_ebpf\":true}",
         get_network_event_name(event->event_type), event->family, event->type, 
-        event->protocol, event->local_port, event->remote_port);
+        event->protocol, 
+        (event->src_ip >> 24) & 0xFF, (event->src_ip >> 16) & 0xFF, (event->src_ip >> 8) & 0xFF, event->src_ip & 0xFF,
+        (event->dst_ip >> 24) & 0xFF, (event->dst_ip >> 16) & 0xFF, (event->dst_ip >> 8) & 0xFF, event->dst_ip & 0xFF,
+        event->src_port, event->dst_port, event->bytes_sent, event->bytes_received);
     
     // Send to Redis
     if (global_redis_conn_ptr) {
@@ -112,9 +115,11 @@ static int handle_network_event(void *ctx, void *data, size_t data_sz) {
         }
     }
     
-    LOG_INFO_MODULE("eBPF-HANDLER", "Network event: PID=%u, Type=%s, Local=%u:%u, Remote=%u:%u", 
+    LOG_INFO_MODULE("eBPF-HANDLER", "Network event: PID=%u, Type=%s, Src=%u.%u.%u.%u:%u, Dst=%u.%u.%u.%u:%u, Sent=%u, Recv=%u", 
            event->pid, get_network_event_name(event->event_type), 
-           event->local_ip, event->local_port, event->remote_ip, event->remote_port);
+           (event->src_ip >> 24) & 0xFF, (event->src_ip >> 16) & 0xFF, (event->src_ip >> 8) & 0xFF, event->src_ip & 0xFF, event->src_port,
+           (event->dst_ip >> 24) & 0xFF, (event->dst_ip >> 16) & 0xFF, (event->dst_ip >> 8) & 0xFF, event->dst_ip & 0xFF, event->dst_port,
+           event->bytes_sent, event->bytes_received);
     
     return 0;
 }
@@ -551,8 +556,10 @@ int process_network_event(const struct network_event *event) {
         return -1;
     }
     
-    LOG_INFO_MODULE("eBPF-HANDLER", "Network event: PID=%d, Type=%s, Ret=%ld", 
-           event->pid, get_network_event_name(event->event_type), event->ret);
+    LOG_INFO_MODULE("eBPF-HANDLER", "Network event: PID=%d, Type=%s, Src=%u.%u.%u.%u:%u, Dst=%u.%u.%u.%u:%u", 
+           event->pid, get_network_event_name(event->event_type), 
+           (event->src_ip >> 24) & 0xFF, (event->src_ip >> 16) & 0xFF, (event->src_ip >> 8) & 0xFF, event->src_ip & 0xFF, event->src_port,
+           (event->dst_ip >> 24) & 0xFF, (event->dst_ip >> 16) & 0xFF, (event->dst_ip >> 8) & 0xFF, event->dst_ip & 0xFF, event->dst_port);
     return 0;
 }
 

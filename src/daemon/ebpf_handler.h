@@ -330,28 +330,31 @@ struct syscall_event {
  * @family: Address family (AF_INET, AF_INET6, etc.)
  * @type: Socket type (SOCK_STREAM, SOCK_DGRAM, etc.)
  * @protocol: Protocol (IPPROTO_TCP, IPPROTO_UDP, etc.)
- * @local_port: Local port number
- * @remote_port: Remote port number
- * @local_ip: Local IP address
- * @remote_ip: Remote IP address
- * @ret: System call return value
+ * @src_ip: Source IP address
+ * @dst_ip: Destination IP address
+ * @src_port: Source port number
+ * @dst_port: Destination port number
+ * @bytes_sent: Number of bytes sent
+ * @bytes_received: Number of bytes received
  * @comm: Process command name
  *
  * Represents a network event captured by eBPF network monitor.
+ * This structure must match the eBPF program structure exactly.
  */
 struct network_event {
 	uint64_t timestamp;		/* Event timestamp */
 	uint32_t pid;			/* Process ID */
 	uint32_t tid;			/* Thread ID */
 	uint32_t event_type;		/* Network event type */
-	uint32_t family;		/* Address family */
-	uint32_t type;			/* Socket type */
-	uint32_t protocol;		/* Protocol */
-	uint32_t local_port;		/* Local port */
-	uint32_t remote_port;		/* Remote port */
-	uint32_t local_ip;		/* Local IP address */
-	uint32_t remote_ip;		/* Remote IP address */
-	int64_t ret;			/* Return value */
+	uint16_t family;		/* Address family */
+	uint16_t type;			/* Socket type */
+	uint16_t protocol;		/* Protocol */
+	uint32_t src_ip;		/* Source IP address */
+	uint32_t dst_ip;		/* Destination IP address */
+	uint16_t src_port;		/* Source port */
+	uint16_t dst_port;		/* Destination port */
+	uint32_t bytes_sent;		/* Bytes sent */
+	uint32_t bytes_received;	/* Bytes received */
 	char comm[16];			/* Process name */
 };
 
