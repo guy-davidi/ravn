@@ -247,29 +247,29 @@ The RAVN CLI now features a comprehensive real-time dashboard with:
 ═══════════════════════════════════════════════════════════════
 🚨 Threat Level: MEDIUM (Score: 0.490)
 📋 Reason: AI analysis: PID=0, Events=1, Score=0.490
-🔗 Redis Status: Connected ✓
-🔍 eBPF Programs: Active ✓ (CPU, Memory, Load, System monitoring)
-📊 System Metrics:
+Redis Status: Connected ✓
+eBPF Programs: Active ✓ (CPU, Memory, Load, System monitoring)
+System Metrics:
    • Events collected: 1
    • Load monitoring: Active
-🧵 Thread Status:
+Thread Status:
    • eBPF monitoring: Running
    • AI analysis: Running
    • Main loop: Active
-⏱️  System Uptime: 0h 50m
+System Uptime: 0h 50m
 ═══════════════════════════════════════════════════════════════
 ```
 
 ### CLI Features
 
-- **🚨 Real-time Threat Monitoring**: Live threat level display with color coding
-- **🔗 Connection Status**: Redis connectivity monitoring with auto-reconnect
-- **🔍 eBPF Program Status**: Shows active monitoring programs (CPU, Memory, Load, System)
-- **📊 System Metrics**: Real-time event counts and monitoring status
-- **🧵 Thread Status**: Multi-threaded architecture status display
-- **⏱️ System Information**: System uptime and health metrics
-- **🎨 Enhanced UI**: Color-coded output with emojis and professional formatting
-- **📱 Auto-refresh**: 2-second update cycle with screen clearing every 10 iterations
+- **Real-time Threat Monitoring**: Live threat level display with color coding
+- **Connection Status**: Redis connectivity monitoring with auto-reconnect
+- **eBPF Program Status**: Shows active monitoring programs (CPU, Memory, Load, System)
+- **System Metrics**: Real-time event counts and monitoring status
+- **Thread Status**: Multi-threaded architecture status display
+- **System Information**: System uptime and health metrics
+- **Enhanced UI**: Color-coded output with professional formatting
+- **Auto-refresh**: 2-second update cycle with screen clearing every 10 iterations
 
 ## Data Flow
 

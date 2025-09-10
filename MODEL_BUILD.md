@@ -58,11 +58,11 @@ static const float model_weights[MODEL_WEIGHT_COUNT] = {
 
 ## Benefits of Compiled Weights
 
-✅ **No runtime file loading** - Weights compiled into binary  
-✅ **Faster startup** - No file I/O during initialization  
-✅ **Better security** - No external model files to tamper with  
-✅ **Simpler deployment** - Single binary with embedded AI  
-✅ **Version control** - Model version tracked in C code  
+- **No runtime file loading** - Weights compiled into binary  
+- **Faster startup** - No file I/O during initialization  
+- **Better security** - No external model files to tamper with  
+- **Simpler deployment** - Single binary with embedded AI  
+- **Version control** - Model version tracked in C code  
 
 ## Model Configuration
 

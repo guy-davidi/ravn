@@ -90,7 +90,7 @@ static const int total_parameters = TOTAL_WEIGHT_COUNT;
     with open(output_header, 'w') as f:
         f.write(header_content)
     
-    print(f"✅ Generated C header: {output_header}")
+    print(f"Generated C header: {output_header}")
     print(f"   Total weights: {len(all_weights)}")
     print(f"   File size: {os.path.getsize(output_header)} bytes")
     print(f"   Architecture: Dense(704) → LSTM(98816) → LSTM(49408) → Dense(2080) → Dense(99)")
@@ -107,7 +107,7 @@ def main():
     # Generate C header
     generate_c_header(args.weights, args.output)
     
-    print(f"\n📝 Next steps:")
+    print(f"\nNext steps:")
     print(f"1. Include '{args.output}' in your C code")
     print(f"2. Replace file loading with direct weight access")
     print(f"3. Recompile the application")

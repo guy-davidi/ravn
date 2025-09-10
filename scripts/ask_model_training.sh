@@ -8,7 +8,7 @@ if [ -f "$ARTIFACTS_DIR/.network_changed" ]; then
     NETWORK_CHANGED=$(cat "$ARTIFACTS_DIR/.network_changed" | cut -d'=' -f2)
     if [ "$NETWORK_CHANGED" = "1" ]; then
         echo ""
-        echo "🤖 NETWORK TRAINING REQUIRED"
+        echo "NETWORK TRAINING REQUIRED"
         echo "================================"
         echo "Network-related code has changed and requires model retraining."
         echo "This process may take several minutes."
