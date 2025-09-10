@@ -1,0 +1,283 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+        - current
+      release_notes:
+        description: 'Release notes (optional)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+env:
+  RAVN_VERSION: ${{ github.ref_name }}
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up environment
+      run: |
+        echo "RAVN_BUILD_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
+        echo "RAVN_BUILD_TIME=$(date -u +'%H:%M:%S')" >> $GITHUB_ENV
+        echo "RAVN_COMMIT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+        
+        # Extract version from tag (remove 'v' prefix)
+        if [[ "${{ github.ref_name }}" =~ ^v(.+)$ ]]; then
+          VERSION="${BASH_REMATCH[1]}"
+        else
+          VERSION="${{ github.ref_name }}"
+        fi
+        echo "RAVN_VERSION=$VERSION" >> $GITHUB_ENV
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          gcc \
+          clang \
+          make \
+          redis-server \
+          libbpf-dev \
+          libhiredis-dev \
+          python3 \
+          python3-pip
+    
+    - name: Start Redis server
+      run: |
+        sudo systemctl start redis-server
+        redis-cli ping || (sudo redis-server --daemonize yes && sleep 2)
+    
+    - name: Generate version information
+      run: |
+        # Create version header for C code
+        DATE_PART=$(echo $RAVN_VERSION | cut -d'.' -f1)
+        MAGIC_PART=$(echo $RAVN_VERSION | cut -d'.' -f2)
+        
+        YEAR=$(echo $DATE_PART | cut -c1-4)
+        MONTH=$(echo $DATE_PART | cut -c5-6)
+        DAY=$(echo $DATE_PART | cut -c7-8)
+        
+        # Remove leading zeros to avoid octal constant issues
+        YEAR_NUM=$((10#$YEAR))
+        MONTH_NUM=$((10#$MONTH))
+        DAY_NUM=$((10#$DAY))
+        MAGIC_NUM=$((10#$MAGIC_PART))
+        
+        cat > src/version.h << EOF
+        #ifndef RAVN_VERSION_H
+        #define RAVN_VERSION_H
+        
+        #define RAVN_VERSION_MAJOR $YEAR_NUM
+        #define RAVN_VERSION_MINOR $MONTH_NUM
+        #define RAVN_VERSION_PATCH $DAY_NUM
+        #define RAVN_VERSION_MAGIC $MAGIC_NUM
+        #define RAVN_VERSION_STRING "$RAVN_VERSION"
+        #define RAVN_BUILD_DATE "$RAVN_BUILD_DATE"
+        #define RAVN_BUILD_TIME "$RAVN_BUILD_TIME"
+        #define RAVN_COMMIT_SHA "$RAVN_COMMIT_SHA"
+        
+        #endif // RAVN_VERSION_H
+        EOF
+        
+        echo "Version header created for $RAVN_VERSION"
+    
+    - name: Build RAVN
+      run: |
+        echo "Building RAVN version $RAVN_VERSION"
+        make clean
+        make all
+        
+        # Verify binary was created
+        if [ -f "artifacts/ravn" ]; then
+          echo "Build successful - Binary size: $(ls -lh artifacts/ravn | awk '{print $5}')"
+        else
+          echo "Build failed - Binary not found"
+          exit 1
+        fi
+    
+    - name: Run tests
+      run: |
+        echo "Running release tests..."
+        
+        # Test help command
+        ./artifacts/ravn help || echo "Help command test failed"
+        
+        # Test version display
+        ./artifacts/ravn --version
+        
+        echo "Release tests completed"
+    
+    - name: Create release assets
+      run: |
+        mkdir -p release-assets
+        
+        # Copy main binary
+        cp artifacts/ravn release-assets/ravn-$RAVN_VERSION-linux-x86_64
+        
+        # Create checksums
+        cd release-assets
+        sha256sum ravn-$RAVN_VERSION-linux-x86_64 > ravn-$RAVN_VERSION-linux-x86_64.sha256
+        md5sum ravn-$RAVN_VERSION-linux-x86_64 > ravn-$RAVN_VERSION-linux-x86_64.md5
+        
+        # Create archive
+        tar -czf ravn-$RAVN_VERSION-linux-x86_64.tar.gz ravn-$RAVN_VERSION-linux-x86_64
+        sha256sum ravn-$RAVN_VERSION-linux-x86_64.tar.gz > ravn-$RAVN_VERSION-linux-x86_64.tar.gz.sha256
+        
+        # Create installation script
+        cat > install-ravn-$RAVN_VERSION.sh << 'EOF'
+        #!/bin/bash
+        # RAVN Security Platform Installation Script
+        
+        set -e
+        
+        echo "RAVN Security Platform v$RAVN_VERSION Installation"
+        echo "=================================================="
+        
+        # Check if running as root
+        if [ "$EUID" -eq 0 ]; then
+          echo "Please do not run this script as root"
+          exit 1
+        fi
+        
+        # Check dependencies
+        echo "Checking dependencies..."
+        
+        if ! command -v gcc &> /dev/null; then
+          echo "Error: gcc is required but not installed"
+          echo "Please install: sudo apt-get install build-essential"
+          exit 1
+        fi
+        
+        if ! command -v redis-server &> /dev/null; then
+          echo "Error: Redis is required but not installed"
+          echo "Please install: sudo apt-get install redis-server"
+          exit 1
+        fi
+        
+        # Install binary
+        echo "Installing RAVN binary..."
+        sudo cp ravn-$RAVN_VERSION-linux-x86_64 /usr/local/bin/ravn
+        sudo chmod +x /usr/local/bin/ravn
+        
+        # Verify installation
+        if /usr/local/bin/ravn --version; then
+          echo ""
+          echo "Installation successful!"
+          echo "RAVN Security Platform v$RAVN_VERSION is now installed"
+          echo ""
+          echo "Usage:"
+          echo "  sudo ravn daemon    # Start monitoring daemon"
+          echo "  ravn cli           # Start CLI dashboard"
+          echo "  ravn --version     # Show version information"
+          echo "  ravn --help        # Show help"
+        else
+          echo "Error: Installation verification failed"
+          exit 1
+        fi
+        EOF
+        
+        # Replace version in install script
+        sed -i "s/\$RAVN_VERSION/$RAVN_VERSION/g" install-ravn-$RAVN_VERSION.sh
+        chmod +x install-ravn-$RAVN_VERSION.sh
+        
+        echo "Release assets created:"
+        ls -la
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        # Generate release notes
+        if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+        else
+          # Auto-generate release notes
+          RELEASE_NOTES="## RAVN Security Platform v$RAVN_VERSION
+          
+          ### What's New
+          - Version: $RAVN_VERSION
+          - Build Date: $RAVN_BUILD_DATE
+          - Commit: $RAVN_COMMIT_SHA
+          
+          ### Features
+          - Real-time eBPF monitoring
+          - AI-powered threat detection
+          - Professional CLI dashboard
+          - Redis-based data storage
+          
+          ### Installation
+          1. Download the release assets
+          2. Run the installation script: \`./install-ravn-$RAVN_VERSION.sh\`
+          3. Start the daemon: \`sudo ravn daemon\`
+          4. Open the dashboard: \`ravn cli\`
+          
+          ### System Requirements
+          - Linux kernel 5.4+
+          - Redis server
+          - Build tools (gcc, clang, make)
+          
+          ### Files Included
+          - \`ravn-$RAVN_VERSION-linux-x86_64\` - Main binary
+          - \`ravn-$RAVN_VERSION-linux-x86_64.tar.gz\` - Compressed archive
+          - \`install-ravn-$RAVN_VERSION.sh\` - Installation script
+          - Checksum files for verification"
+        fi
+        
+        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ env.RAVN_VERSION }}
+        name: RAVN Security Platform v${{ env.RAVN_VERSION }}
+        body: ${{ steps.release_notes.outputs.release_notes }}
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+        files: |
+          release-assets/ravn-${{ env.RAVN_VERSION }}-linux-x86_64
+          release-assets/ravn-${{ env.RAVN_VERSION }}-linux-x86_64.tar.gz
+          release-assets/ravn-${{ env.RAVN_VERSION }}-linux-x86_64.sha256
+          release-assets/ravn-${{ env.RAVN_VERSION }}-linux-x86_64.tar.gz.sha256
+          release-assets/ravn-${{ env.RAVN_VERSION }}-linux-x86_64.md5
+          release-assets/install-ravn-${{ env.RAVN_VERSION }}.sh
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Release summary
+      if: always()
+      run: |
+        echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: $RAVN_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Date**: $RAVN_BUILD_DATE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit SHA**: $RAVN_COMMIT_SHA" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Pre-release**: ${{ github.event.inputs.prerelease }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "artifacts/ravn" ]; then
+          echo "- **Binary Size**: $(ls -lh artifacts/ravn | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+        fi

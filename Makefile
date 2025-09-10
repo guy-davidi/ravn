@@ -43,6 +43,21 @@ version-force:
 version-reset:
 	@./scripts/version.sh reset
 
+release-local:
+	@./scripts/release.sh local
+
+release-tag:
+	@./scripts/release.sh tag
+
+release-github:
+	@./scripts/release.sh github
+
+release-full:
+	@./scripts/release.sh full
+
+release-list:
+	@./scripts/release.sh list
+
 force-model:
 	@read -p "Force retrain model? [y/N]: " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
@@ -94,9 +109,14 @@ help:
 	@echo "  version-update - Update version (if changes detected)"
 	@echo "  version-force  - Force version update"
 	@echo "  version-reset  - Reset version to current date.1"
+	@echo "  release-local  - Create local release"
+	@echo "  release-tag    - Create git tag"
+	@echo "  release-github - Trigger GitHub release"
+	@echo "  release-full   - Full release process (local + tag + github)"
+	@echo "  release-list   - List existing releases"
 	@echo "  clean          - Clean build artifacts"
 	@echo "  clean-all      - Force clean everything"
 	@echo "  redis          - Start Redis server"
 	@echo "  help           - Show this help"
 
-.PHONY: all clean clean-all redis model force-model version version-update version-force version-reset help
+.PHONY: all clean clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list help
