@@ -10,6 +10,7 @@ struct network_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tid;
+    __u32 event_type;
     __u16 family;
     __u16 type;
     __u16 protocol;
@@ -43,6 +44,7 @@ int trace_network_send(struct pt_regs *ctx) {
     event->timestamp = bpf_ktime_get_ns();
     event->pid = bpf_get_current_pid_tgid() >> 32;
     event->tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
+    event->event_type = 1; // Network send
     event->family = 2; // AF_INET
     event->type = 1;   // SOCK_STREAM
     event->protocol = 6; // TCP
