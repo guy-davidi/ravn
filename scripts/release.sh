@@ -75,7 +75,7 @@ create_local_release() {
     
     # Build the project
     print_status "Building project..."
-    make clean
+    make clean-ci
     make all
     
     if [ ! -f "artifacts/ravn" ]; then

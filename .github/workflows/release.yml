@@ -109,7 +109,7 @@ jobs:
     - name: Build RAVN
       run: |
         echo "Building RAVN version $RAVN_VERSION"
-        make clean
+        make clean-ci
         make all
         
         # Verify binary was created

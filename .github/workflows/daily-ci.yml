@@ -83,7 +83,7 @@ jobs:
     - name: Build RAVN
       run: |
         echo "Building RAVN version ${RAVN_VERSION}"
-        make clean
+        make clean-ci
         make all
         
         # Verify binary was created
@@ -110,7 +110,7 @@ jobs:
       run: |
         echo "Checking for compilation warnings..."
         # Rebuild with verbose output to catch warnings
-        make clean
+        make clean-ci
         make all 2>&1 | tee build.log
         
         # Count warnings

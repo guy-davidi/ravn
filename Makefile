@@ -89,6 +89,11 @@ clean:
 	fi
 	@rm -rf $(ARTIFACTS_DIR)
 
+clean-ci:
+	@echo "[CLEAN] Removing all artifacts for CI build"
+	@rm -f $(MODEL_HEADER) $(NETWORK_HASH_FILE)
+	@rm -rf $(ARTIFACTS_DIR)
+
 clean-all:
 	@read -p "Remove ALL artifacts? [y/N]: " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
@@ -114,9 +119,10 @@ help:
 	@echo "  release-github - Trigger GitHub release"
 	@echo "  release-full   - Full release process (local + tag + github)"
 	@echo "  release-list   - List existing releases"
-	@echo "  clean          - Clean build artifacts"
+	@echo "  clean          - Clean build artifacts (interactive)"
+	@echo "  clean-ci       - Clean build artifacts (non-interactive for CI)"
 	@echo "  clean-all      - Force clean everything"
 	@echo "  redis          - Start Redis server"
 	@echo "  help           - Show this help"
 
-.PHONY: all clean clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list help
+.PHONY: all clean clean-ci clean-all redis model force-model version version-update version-force version-reset release-local release-tag release-github release-full release-list help
