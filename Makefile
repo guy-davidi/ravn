@@ -16,7 +16,7 @@ OBJECTS = $(C_SOURCES:$(SRC_DIR)/%.c=$(ARTIFACTS_DIR)/%.o)
 EBPF_OBJECTS = $(ARTIFACTS_DIR)/syscall_monitor.bpf.o $(ARTIFACTS_DIR)/network_monitor.bpf.o \
                $(ARTIFACTS_DIR)/security_monitor.bpf.o $(ARTIFACTS_DIR)/file_monitor.bpf.o
 
-all: $(VERSION_HEADER) $(MODEL_HEADER) $(RAVN)
+all: $(VERSION_HEADER) $(MODEL_HEADER) $(EBPF_OBJECTS) $(RAVN)
 
 $(ARTIFACTS_DIR):
 	@mkdir -p $@
@@ -77,10 +77,22 @@ $(ARTIFACTS_DIR)/%.o: $(SRC_DIR)/%.c
 $(ARTIFACTS_DIR)/ai_engine.o: $(MODEL_HEADER)
 $(ARTIFACTS_DIR)/ravn_rnn_lstm.o: $(MODEL_HEADER)
 
-$(ARTIFACTS_DIR)/%.bpf.o: $(SRC_DIR)/ebpf/%.bpf.c
+# eBPF compilation flags
+CLANG_FLAGS = -Wall -Wextra -g -O3 -target bpf -D__TARGET_ARCH_x86_64 -I$(SRC_DIR)
+
+# Generate vmlinux.h if needed
+$(SRC_DIR)/vmlinux.h:
+	@echo "[eBPF] Generating vmlinux.h"
+	@if command -v bpftool >/dev/null 2>&1; then \
+		sudo bpftool btf dump file /sys/kernel/btf/vmlinux format c > $(SRC_DIR)/vmlinux.h; \
+	else \
+		echo "[eBPF] bpftool not available, using minimal vmlinux.h"; \
+	fi
+
+$(ARTIFACTS_DIR)/%.bpf.o: $(SRC_DIR)/ebpf/%.bpf.c $(SRC_DIR)/vmlinux.h
 	@mkdir -p $(dir $@)
 	@echo "[eBPF] $@"
-	clang -O2 -target bpf -c $< -o $@
+	clang $(CLANG_FLAGS) -c $< -o $@
 
 clean:
 	@read -p "Remove network artifacts? [y/N]: " confirm; \
