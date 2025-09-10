@@ -110,6 +110,12 @@ generate_version_header() {
     local month=$(echo "$date_part" | cut -c5-6)
     local day=$(echo "$date_part" | cut -c7-8)
     
+    # Remove leading zeros to avoid octal constant issues
+    local year_num=$((10#$year))
+    local month_num=$((10#$month))
+    local day_num=$((10#$day))
+    local magic_num=$((10#$magic_part))
+    
     # Create version header
     cat > "$VERSION_HEADER" << EOF
 #ifndef RAVN_VERSION_H
@@ -118,10 +124,10 @@ generate_version_header() {
 // Auto-generated version information
 // Generated on: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
 
-#define RAVN_VERSION_MAJOR $year
-#define RAVN_VERSION_MINOR $month
-#define RAVN_VERSION_PATCH $day
-#define RAVN_VERSION_MAGIC $magic_part
+#define RAVN_VERSION_MAJOR $year_num
+#define RAVN_VERSION_MINOR $month_num
+#define RAVN_VERSION_PATCH $day_num
+#define RAVN_VERSION_MAGIC $magic_num
 #define RAVN_VERSION_STRING "$version"
 #define RAVN_BUILD_DATE "$build_date"
 #define RAVN_BUILD_TIME "$build_time"
