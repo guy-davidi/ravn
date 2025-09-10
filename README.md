@@ -7,7 +7,7 @@
         <img src="https://github.com/guy-davidi/ravn/actions/workflows/release.yml/badge.svg" alt="Release RAVN"/>
     </a>
     <a href="https://github.com/guy-davidi/ravn/releases" target="_blank">
-        <img src="https://img.shields.io/badge/release-v20250910.2-blue" alt="Latest Release"/>
+        <img src="https://img.shields.io/badge/RAVN Security Platform vmaster" alt="Latest Release"/>
     </a>
 </p>
 
