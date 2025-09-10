@@ -1,5 +1,5 @@
 // RAVN eBPF Handler Implementation
-// Real eBPF-based system monitoring
+// Real eBPF-based system monitoring with ring buffer collection
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,13 +11,25 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <pthread.h>
+#include <errno.h>
+#include <bpf/libbpf.h>
+#include <bpf/bpf.h>
 #include "ebpf_handler.h"
 #include "../utils/logger.h"
 
-// Global variables for real-time monitoring
+// Global variables for eBPF programs and ring buffers
+static struct bpf_object *syscall_obj = NULL;
+static struct bpf_object *network_obj = NULL;
+static struct bpf_object *security_obj = NULL;
+static struct bpf_object *file_obj = NULL;
+
+static struct ring_buffer *syscall_rb = NULL;
+static struct ring_buffer *network_rb = NULL;
+static struct ring_buffer *security_rb = NULL;
+static struct ring_buffer *file_rb = NULL;
+
 static int monitoring_active = 0;
 static pthread_t monitoring_thread;
-// static FILE *proc_monitor = NULL; // Unused variable - commented out
 
 // External Redis connection (set by main.c)
 extern void* global_redis_conn_ptr;
@@ -26,189 +38,489 @@ extern void* global_redis_conn_ptr;
 int redis_send_event(void* conn, const struct ravn_event *event);
 char* redis_get_last_error(void);
 
-// Real system monitoring using /proc filesystem
-static void* real_time_monitor(void *arg) {
-    (void)arg; // Suppress unused parameter warning
-    LOG_INFO("Starting real-time system monitoring");
+// Ring buffer event handlers
+static int handle_syscall_event(void *ctx, void *data, size_t data_sz) {
+    const struct syscall_event *event = (const struct syscall_event *)data;
     
-    static unsigned long last_cpu_user = 0, last_cpu_system = 0, last_cpu_idle = 0;
-    static int event_counter = 0;
-    
-    while (monitoring_active) {
-        // Monitor /proc/stat for real CPU activity
-        FILE *fp = fopen("/proc/stat", "r");
-        if (fp) {
-            char line[256];
-            if (fgets(line, sizeof(line), fp)) {
-                // Parse CPU statistics
-                unsigned long user, nice, system, idle, iowait, irq, softirq;
-                if (sscanf(line, "cpu %lu %lu %lu %lu %lu %lu %lu", 
-                          &user, &nice, &system, &idle, &iowait, &irq, &softirq) >= 4) {
-                    
-                    // Calculate CPU usage change
-                    unsigned long total_prev = last_cpu_user + last_cpu_system + last_cpu_idle;
-                    unsigned long total_curr = user + system + idle;
-                    
-                    if (total_prev > 0 && total_curr > total_prev) {
-                        unsigned long user_diff = user - last_cpu_user;
-                        unsigned long system_diff = system - last_cpu_system;
-                        unsigned long idle_diff = idle - last_cpu_idle;
-                        unsigned long total_diff = total_curr - total_prev;
-                        
-                        // Create real system activity event
-                        struct ravn_event activity_event = {
-                            .timestamp = time(NULL),
-                            .pid = 0, // System-wide
-                            .tid = 0,
-                            .event_type = 1, // System activity
-                            .event_category = 1, // System
-                            .comm = "system"
-                        };
-                        
-                        snprintf(activity_event.data, sizeof(activity_event.data),
-                                "{\"cpu_user\":%lu,\"cpu_system\":%lu,\"cpu_idle\":%lu,\"total\":%lu,\"real_data\":true,\"counter\":%d}",
-                                user_diff, system_diff, idle_diff, total_diff, event_counter);
-                        
-                        LOG_INFO_MODULE("eBPF-HANDLER", "Real CPU activity: user=%lu, system=%lu, idle=%lu, total=%lu", 
-                               user_diff, system_diff, idle_diff, total_diff);
-                        
-                        // Send real event to Redis
-                        if (global_redis_conn_ptr) {
-                            int result = redis_send_event(global_redis_conn_ptr, &activity_event);
-                            if (result == 0) {
-                                // CPU event sent successfully (no need to log every event)
-                            } else {
-                                LOG_ERROR("Failed to send CPU event: %s", redis_get_last_error());
-                            }
-                        }
-                        
-                        // Store previous values
-                        last_cpu_user = user;
-                        last_cpu_system = system;
-                        last_cpu_idle = idle;
-                        event_counter++;
-                    }
-                }
-            }
-            fclose(fp);
-        }
-        
-        // Monitor /proc/loadavg for system load
-        fp = fopen("/proc/loadavg", "r");
-        if (fp) {
-            char line[256];
-            if (fgets(line, sizeof(line), fp)) {
-                float load1, load5, load15;
-                int running, total;
-                if (sscanf(line, "%f %f %f %d/%d", &load1, &load5, &load15, &running, &total) >= 5) {
-                    
-                    // Create load average event
-                    struct ravn_event load_event = {
-                        .timestamp = time(NULL),
-                        .pid = 0,
-                        .tid = 0,
-                        .event_type = 2, // Load average
-                        .event_category = 1, // System
-                        .comm = "system"
-                    };
-                    
-                    snprintf(load_event.data, sizeof(load_event.data),
-                            "{\"load1\":%.2f,\"load5\":%.2f,\"load15\":%.2f,\"running\":%d,\"total\":%d,\"real_data\":true}",
-                            load1, load5, load15, running, total);
-                    
-                    LOG_INFO_MODULE("eBPF-HANDLER", "Real load average: 1min=%.2f, 5min=%.2f, 15min=%.2f, processes=%d/%d", 
-                           load1, load5, load15, running, total);
-                    
-                    // Send real load event to Redis
-                    if (global_redis_conn_ptr) {
-                        int result = redis_send_event(global_redis_conn_ptr, &load_event);
-                        if (result == 0) {
-                            LOG_INFO_MODULE("eBPF-HANDLER", "✓ Sent real load event to Redis");
-                        } else {
-                            LOG_ERROR_MODULE("eBPF-HANDLER", "✗ Failed to send load event: %s", redis_get_last_error());
-                        }
-                    }
-                }
-            }
-            fclose(fp);
-        }
-        
-        // Monitor /proc/meminfo for memory usage
-        fp = fopen("/proc/meminfo", "r");
-        if (fp) {
-            char line[256];
-            unsigned long mem_total = 0, mem_free = 0, mem_available = 0;
-            
-            while (fgets(line, sizeof(line), fp)) {
-                if (sscanf(line, "MemTotal: %lu kB", &mem_total) == 1) continue;
-                if (sscanf(line, "MemFree: %lu kB", &mem_free) == 1) continue;
-                if (sscanf(line, "MemAvailable: %lu kB", &mem_available) == 1) continue;
-            }
-            fclose(fp);
-            
-            if (mem_total > 0) {
-                // Create memory usage event
-                struct ravn_event mem_event = {
-                    .timestamp = time(NULL),
-                    .pid = 0,
-                    .tid = 0,
-                    .event_type = 3, // Memory usage
-                    .event_category = 1, // System
-                    .comm = "system"
-                };
-                
-                snprintf(mem_event.data, sizeof(mem_event.data),
-                        "{\"total\":%lu,\"free\":%lu,\"available\":%lu,\"used_percent\":%.1f,\"real_data\":true}",
-                        mem_total, mem_free, mem_available, 
-                        ((float)(mem_total - mem_available) / mem_total) * 100.0);
-                
-                LOG_INFO_MODULE("eBPF-HANDLER", "Real memory usage: total=%lu kB, free=%lu kB, available=%lu kB", 
-                       mem_total, mem_free, mem_available);
-                
-                // Send real memory event to Redis
-                if (global_redis_conn_ptr) {
-                    int result = redis_send_event(global_redis_conn_ptr, &mem_event);
-                    if (result == 0) {
-                        LOG_INFO_MODULE("eBPF-HANDLER", "✓ Sent real memory event to Redis");
-                    } else {
-                        LOG_ERROR_MODULE("eBPF-HANDLER", "✗ Failed to send memory event: %s", redis_get_last_error());
-                    }
-                }
-            }
-        }
-        
-        sleep(2); // 2 second monitoring interval for real data
+    if (data_sz < sizeof(*event)) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid syscall event size: %zu", data_sz);
+        return 0;
     }
     
-    LOG_INFO_MODULE("eBPF-HANDLER", "Real-time monitoring stopped");
+    // Convert to generic ravn_event
+    struct ravn_event ravn_event = {
+        .timestamp = event->timestamp,
+        .pid = event->pid,
+        .tid = event->tid,
+        .event_type = event->syscall_nr,
+        .event_category = 1, // Syscall category
+        .comm = {0}
+    };
+    
+    strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+    
+    // Create JSON data
+    snprintf(ravn_event.data, sizeof(ravn_event.data),
+        "{\"syscall\":\"%s\",\"filename\":\"%s\",\"ret\":%ld,\"real_ebpf\":true}",
+        get_syscall_name(event->syscall_nr), event->filename, event->ret);
+    
+    // Send to Redis
+    if (global_redis_conn_ptr) {
+        int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+        if (result != 0) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send syscall event: %s", redis_get_last_error());
+        }
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "Syscall event: PID=%u, Syscall=%s, File=%s", 
+           event->pid, get_syscall_name(event->syscall_nr), event->filename);
+    
+    return 0;
+}
+
+static int handle_network_event(void *ctx, void *data, size_t data_sz) {
+    const struct network_event *event = (const struct network_event *)data;
+    
+    if (data_sz < sizeof(*event)) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid network event size: %zu", data_sz);
+        return 0;
+    }
+    
+    // Convert to generic ravn_event
+    struct ravn_event ravn_event = {
+        .timestamp = event->timestamp,
+        .pid = event->pid,
+        .tid = event->tid,
+        .event_type = event->event_type,
+        .event_category = 2, // Network category
+        .comm = {0}
+    };
+    
+    strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+    
+    // Create JSON data
+    snprintf(ravn_event.data, sizeof(ravn_event.data),
+        "{\"event_type\":\"%s\",\"family\":%u,\"type\":%u,\"protocol\":%u,\"local_port\":%u,\"remote_port\":%u,\"real_ebpf\":true}",
+        get_network_event_name(event->event_type), event->family, event->type, 
+        event->protocol, event->local_port, event->remote_port);
+    
+    // Send to Redis
+    if (global_redis_conn_ptr) {
+        int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+        if (result != 0) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send network event: %s", redis_get_last_error());
+        }
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "Network event: PID=%u, Type=%s, Local=%u:%u, Remote=%u:%u", 
+           event->pid, get_network_event_name(event->event_type), 
+           event->local_ip, event->local_port, event->remote_ip, event->remote_port);
+    
+    return 0;
+}
+
+static int handle_security_event(void *ctx, void *data, size_t data_sz) {
+    const struct security_event *event = (const struct security_event *)data;
+    
+    if (data_sz < sizeof(*event)) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid security event size: %zu", data_sz);
+        return 0;
+    }
+    
+    // Convert to generic ravn_event
+    struct ravn_event ravn_event = {
+        .timestamp = event->timestamp,
+        .pid = event->pid,
+        .tid = event->tid,
+        .event_type = event->event_type,
+        .event_category = 3, // Security category
+        .comm = {0}
+    };
+    
+    strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+    
+    // Create JSON data
+    snprintf(ravn_event.data, sizeof(ravn_event.data),
+        "{\"event_type\":\"%s\",\"target_pid\":%u,\"uid\":%u,\"gid\":%u,\"mode\":%u,\"pathname\":\"%s\",\"real_ebpf\":true}",
+        get_security_event_name(event->event_type), event->target_pid, 
+        event->uid, event->gid, event->mode, event->pathname);
+    
+    // Send to Redis
+    if (global_redis_conn_ptr) {
+        int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+        if (result != 0) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send security event: %s", redis_get_last_error());
+        }
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "Security event: PID=%u, Type=%s, Target=%u, Path=%s", 
+           event->pid, get_security_event_name(event->event_type), event->target_pid, event->pathname);
+    
+    return 0;
+}
+
+static int handle_file_event(void *ctx, void *data, size_t data_sz) {
+    const struct file_event *event = (const struct file_event *)data;
+    
+    if (data_sz < sizeof(*event)) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid file event size: %zu", data_sz);
+        return 0;
+    }
+    
+    // Convert to generic ravn_event
+    struct ravn_event ravn_event = {
+        .timestamp = event->timestamp,
+        .pid = event->pid,
+        .tid = event->tid,
+        .event_type = event->event_type,
+        .event_category = 4, // File category
+        .comm = {0}
+    };
+    
+    strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+    
+    // Create JSON data
+    snprintf(ravn_event.data, sizeof(ravn_event.data),
+        "{\"event_type\":\"%s\",\"fd\":%u,\"flags\":%u,\"mode\":%u,\"size\":%lu,\"filename\":\"%s\",\"target_filename\":\"%s\",\"real_ebpf\":true}",
+        get_file_event_name(event->event_type), event->fd, event->flags, 
+        event->mode, event->size, event->filename, event->target_filename);
+    
+    // Send to Redis
+    if (global_redis_conn_ptr) {
+        int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+        if (result != 0) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send file event: %s", redis_get_last_error());
+        }
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "File event: PID=%u, Type=%s, FD=%u, File=%s", 
+           event->pid, get_file_event_name(event->event_type), event->fd, event->filename);
+    
+    return 0;
+}
+
+// Ring buffer polling thread
+static void* ring_buffer_poll_thread(void *arg) {
+    (void)arg;
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "Ring buffer polling thread started");
+    
+    while (monitoring_active) {
+        int err;
+        
+        // Poll all ring buffers with 1 second timeout
+        err = ring_buffer__poll(syscall_rb, 1000);
+        if (err < 0 && err != -EINTR) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling syscall ring buffer: %s", strerror(-err));
+        }
+        
+        err = ring_buffer__poll(network_rb, 1000);
+        if (err < 0 && err != -EINTR) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling network ring buffer: %s", strerror(-err));
+        }
+        
+        err = ring_buffer__poll(security_rb, 1000);
+        if (err < 0 && err != -EINTR) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling security ring buffer: %s", strerror(-err));
+        }
+        
+        err = ring_buffer__poll(file_rb, 1000);
+        if (err < 0 && err != -EINTR) {
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling file ring buffer: %s", strerror(-err));
+        }
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "Ring buffer polling thread stopped");
     return NULL;
 }
 
-// Initialize eBPF handlers with real monitoring
-int init_ebpf_handlers(void) {
-    LOG_INFO_MODULE("eBPF-HANDLER", "Initializing real eBPF-based system monitoring");
-    monitoring_active = 1;
+// Load and attach eBPF programs
+static int load_ebpf_programs(void) {
+    int err;
     
-    // Start real-time monitoring thread
-    if (pthread_create(&monitoring_thread, NULL, real_time_monitor, NULL) != 0) {
-        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create monitoring thread");
+    // Load syscall monitor
+    syscall_obj = bpf_object__open_file("artifacts/syscall_monitor.bpf.o", NULL);
+    if (libbpf_get_error(syscall_obj)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(syscall_obj), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open syscall monitor: %s", err_buf);
         return -1;
     }
     
-    LOG_INFO_MODULE("eBPF-HANDLER", "Real-time system monitoring started");
+    err = bpf_object__load(syscall_obj);
+    if (err) {
+        char err_buf[256];
+        libbpf_strerror(err, err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load syscall monitor: %s", err_buf);
+        return -1;
+    }
+    
+    // Load network monitor
+    network_obj = bpf_object__open_file("artifacts/network_monitor.bpf.o", NULL);
+    if (libbpf_get_error(network_obj)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(network_obj), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open network monitor: %s", err_buf);
+        return -1;
+    }
+    
+    err = bpf_object__load(network_obj);
+    if (err) {
+        char err_buf[256];
+        libbpf_strerror(err, err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load network monitor: %s", err_buf);
+        return -1;
+    }
+    
+    // Load security monitor
+    security_obj = bpf_object__open_file("artifacts/security_monitor.bpf.o", NULL);
+    if (libbpf_get_error(security_obj)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(security_obj), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open security monitor: %s", err_buf);
+        return -1;
+    }
+    
+    err = bpf_object__load(security_obj);
+    if (err) {
+        char err_buf[256];
+        libbpf_strerror(err, err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load security monitor: %s", err_buf);
+        return -1;
+    }
+    
+    // Load file monitor
+    file_obj = bpf_object__open_file("artifacts/file_monitor.bpf.o", NULL);
+    if (libbpf_get_error(file_obj)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(file_obj), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open file monitor: %s", err_buf);
+        return -1;
+    }
+    
+    err = bpf_object__load(file_obj);
+    if (err) {
+        char err_buf[256];
+        libbpf_strerror(err, err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load file monitor: %s", err_buf);
+        return -1;
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "All eBPF programs loaded successfully");
+    return 0;
+}
+
+// Attach eBPF programs to kernel hooks
+static int attach_ebpf_programs(void) {
+    // Attach syscall programs
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, syscall_obj) {
+        struct bpf_link *link = bpf_program__attach(prog);
+        if (libbpf_get_error(link)) {
+            char err_buf[256];
+            libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s", 
+                   bpf_program__name(prog), err_buf);
+            return -1;
+        }
+    }
+    
+    // Attach network programs
+    bpf_object__for_each_program(prog, network_obj) {
+        struct bpf_link *link = bpf_program__attach(prog);
+        if (libbpf_get_error(link)) {
+            char err_buf[256];
+            libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s", 
+                   bpf_program__name(prog), err_buf);
+            return -1;
+        }
+    }
+    
+    // Attach security programs
+    bpf_object__for_each_program(prog, security_obj) {
+        struct bpf_link *link = bpf_program__attach(prog);
+        if (libbpf_get_error(link)) {
+            char err_buf[256];
+            libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s", 
+                   bpf_program__name(prog), err_buf);
+            return -1;
+        }
+    }
+    
+    // Attach file programs
+    bpf_object__for_each_program(prog, file_obj) {
+        struct bpf_link *link = bpf_program__attach(prog);
+        if (libbpf_get_error(link)) {
+            char err_buf[256];
+            libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+            LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s", 
+                   bpf_program__name(prog), err_buf);
+            return -1;
+        }
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "All eBPF programs attached successfully");
+    return 0;
+}
+
+// Create ring buffers
+static int create_ring_buffers(void) {
+    struct bpf_map *map;
+    
+    // Create syscall ring buffer
+    map = bpf_object__find_map_by_name(syscall_obj, "syscall_events");
+    if (!map) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find syscall_events map");
+        return -1;
+    }
+    
+    syscall_rb = ring_buffer__new(bpf_map__fd(map), handle_syscall_event, NULL, NULL);
+    if (libbpf_get_error(syscall_rb)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(syscall_rb), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create syscall ring buffer: %s", err_buf);
+        return -1;
+    }
+    
+    // Create network ring buffer
+    map = bpf_object__find_map_by_name(network_obj, "network_events");
+    if (!map) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find network_events map");
+        return -1;
+    }
+    
+    network_rb = ring_buffer__new(bpf_map__fd(map), handle_network_event, NULL, NULL);
+    if (libbpf_get_error(network_rb)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(network_rb), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create network ring buffer: %s", err_buf);
+        return -1;
+    }
+    
+    // Create security ring buffer
+    map = bpf_object__find_map_by_name(security_obj, "security_events");
+    if (!map) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find security_events map");
+        return -1;
+    }
+    
+    security_rb = ring_buffer__new(bpf_map__fd(map), handle_security_event, NULL, NULL);
+    if (libbpf_get_error(security_rb)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(security_rb), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create security ring buffer: %s", err_buf);
+        return -1;
+    }
+    
+    // Create file ring buffer
+    map = bpf_object__find_map_by_name(file_obj, "file_events");
+    if (!map) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find file_events map");
+        return -1;
+    }
+    
+    file_rb = ring_buffer__new(bpf_map__fd(map), handle_file_event, NULL, NULL);
+    if (libbpf_get_error(file_rb)) {
+        char err_buf[256];
+        libbpf_strerror(libbpf_get_error(file_rb), err_buf, sizeof(err_buf));
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create file ring buffer: %s", err_buf);
+        return -1;
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "All ring buffers created successfully");
+    return 0;
+}
+
+// Initialize eBPF handlers with real ring buffer monitoring
+int init_ebpf_handlers(void) {
+    LOG_INFO_MODULE("eBPF-HANDLER", "Initializing real eBPF ring buffer monitoring");
+    
+    // Load eBPF programs
+    if (load_ebpf_programs() != 0) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load eBPF programs");
+        return -1;
+    }
+    
+    // Attach eBPF programs
+    if (attach_ebpf_programs() != 0) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to attach eBPF programs");
+        return -1;
+    }
+    
+    // Create ring buffers
+    if (create_ring_buffers() != 0) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create ring buffers");
+        return -1;
+    }
+    
+    monitoring_active = 1;
+    
+    // Start ring buffer polling thread
+    if (pthread_create(&monitoring_thread, NULL, ring_buffer_poll_thread, NULL) != 0) {
+        LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create ring buffer polling thread");
+        return -1;
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "Real eBPF ring buffer monitoring started");
     return 0;
 }
 
 // Cleanup eBPF handlers
 void cleanup_ebpf_handlers(void) {
-    LOG_INFO_MODULE("eBPF-HANDLER", "Stopping real-time monitoring...");
+    LOG_INFO_MODULE("eBPF-HANDLER", "Stopping eBPF ring buffer monitoring...");
+    
     monitoring_active = 0;
     
+    // Wait for polling thread to finish
     if (monitoring_thread) {
         pthread_join(monitoring_thread, NULL);
     }
     
-    LOG_INFO_MODULE("eBPF-HANDLER", "Real-time monitoring stopped and cleaned up");
+    // Cleanup ring buffers
+    if (syscall_rb) {
+        ring_buffer__free(syscall_rb);
+        syscall_rb = NULL;
+    }
+    
+    if (network_rb) {
+        ring_buffer__free(network_rb);
+        network_rb = NULL;
+    }
+    
+    if (security_rb) {
+        ring_buffer__free(security_rb);
+        security_rb = NULL;
+    }
+    
+    if (file_rb) {
+        ring_buffer__free(file_rb);
+        file_rb = NULL;
+    }
+    
+    // Cleanup eBPF objects
+    if (syscall_obj) {
+        bpf_object__close(syscall_obj);
+        syscall_obj = NULL;
+    }
+    
+    if (network_obj) {
+        bpf_object__close(network_obj);
+        network_obj = NULL;
+    }
+    
+    if (security_obj) {
+        bpf_object__close(security_obj);
+        security_obj = NULL;
+    }
+    
+    if (file_obj) {
+        bpf_object__close(file_obj);
+        file_obj = NULL;
+    }
+    
+    LOG_INFO_MODULE("eBPF-HANDLER", "eBPF ring buffer monitoring stopped and cleaned up");
 }
 
 // Start monitoring (simplified for POC)
