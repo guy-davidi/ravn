@@ -106,6 +106,9 @@ jobs:
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
         
+        # Generate version header
+        make version-update
+        
         make clean-ci
         make all
         
@@ -136,6 +139,9 @@ jobs:
         
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
+        
+        # Generate version header
+        make version-update
         
         # Rebuild with verbose output to catch warnings
         make clean-ci
