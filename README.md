@@ -1,5 +1,4 @@
 
-# RAVN Security Platform
 <p align="center">
     <a href="https://github.com/guy-davidi/ravn/actions/workflows/daily-ci.yml" target="_blank">
         <img src="https://github.com/guy-davidi/ravn/actions/workflows/daily-ci.yml/badge.svg" alt="Daily CI"/>
