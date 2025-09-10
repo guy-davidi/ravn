@@ -5,17 +5,20 @@
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 
-// Event structure for file events
+// Event structure for file events (must match user-space structure)
 struct file_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tid;
     __u32 event_type;
-    __u32 operation;
+    __u32 fd;
     __u32 flags;
     __u32 mode;
+    __u64 size;
+    __s64 ret;
     char comm[16];
     char filename[256];
+    char target_filename[256];
 };
 
 // Ring buffer map
@@ -40,15 +43,20 @@ int trace_file_event(struct pt_regs *ctx) {
     event->pid = bpf_get_current_pid_tgid() >> 32;
     event->tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
     event->event_type = 1; // File open
-    event->operation = 1; // Open
-    event->flags = 0;     // O_RDONLY
-    event->mode = 0644;   // Default mode
+    event->fd = 0;         // File descriptor (will be set by kernel)
+    event->flags = 0;      // O_RDONLY
+    event->mode = 0644;    // Default mode
+    event->size = 0;       // No data size for open
+    event->ret = 0;        // Return value (will be set by kernel)
     
     // Get process name
     bpf_get_current_comm(&event->comm, sizeof(event->comm));
     
     // Simple filename
     __builtin_memcpy(event->filename, "/tmp/ravn_test", 14);
+    
+    // Initialize target filename (empty for open operations)
+    __builtin_memset(event->target_filename, 0, sizeof(event->target_filename));
     
     // Submit event
     bpf_ringbuf_submit(event, 0);
