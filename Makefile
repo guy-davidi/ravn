@@ -73,7 +73,8 @@ $(ARTIFACTS_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo "[CC] $<"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Specific dependencies for files that need model header
+# Specific dependencies for files that need headers
+$(ARTIFACTS_DIR)/main.o: $(VERSION_HEADER)
 $(ARTIFACTS_DIR)/ai_engine.o: $(MODEL_HEADER)
 $(ARTIFACTS_DIR)/ravn_rnn_lstm.o: $(MODEL_HEADER)
 
