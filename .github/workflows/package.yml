@@ -170,6 +170,22 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
     
+    - name: Set package visibility to private
+      run: |
+        echo "Setting package visibility to private..."
+        # For personal repositories, use the user endpoint
+        if [[ "${{ github.repository_owner }}" == "${{ github.actor }}" ]]; then
+          API_URL="https://api.github.com/user/packages/container/${{ github.event.repository.name }}/visibility"
+        else
+          API_URL="https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/visibility"
+        fi
+        
+        curl -X PATCH \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "$API_URL" \
+          -d '{"visibility":"private"}' || echo "Failed to set visibility (package may already be private)"
+    
     - name: Package summary
       if: always()
       run: |
