@@ -1,4 +1,28 @@
+
 # RAVN Security Platform
+<p align="center">
+    <a href="https://github.com/guy-davidi/ravn/actions/workflows/daily-ci.yml" target="_blank">
+        <img src="https://github.com/guy-davidi/ravn/actions/workflows/daily-ci.yml/badge.svg" alt="Daily CI"/>
+    </a>
+    <a href="https://github.com/guy-davidi/ravn/actions/workflows/release.yml" target="_blank">
+        <img src="https://github.com/guy-davidi/ravn/actions/workflows/release.yml/badge.svg" alt="Release RAVN"/>
+    </a>
+    <a href="https://github.com/guy-davidi/ravn/releases" target="_blank">
+        <img src="https://img.shields.io/github/v/release/guy-davidi/ravn" alt="Latest Release"/>
+    </a>
+</p>
+
+<div align="center">
+    <h1>🛡️ RAVN - Runtime Anomaly & Vulnerability Network</h1>
+    <h2>Real-time security monitoring with eBPF and AI threat detection</h2>
+    <h4>If you find RAVN helpful, please ⭐ this repository to show your support!</h4>
+    <h3>
+        <a href="#quick-start">Quick Start</a>
+        • <a href="#architecture">Architecture</a>
+        • <a href="#features">Features</a>
+        • <a href="#installation">Installation</a>
+    </h3>
+</div>
 
 Real-time security monitoring with eBPF and AI threat detection.
 
