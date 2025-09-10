@@ -138,10 +138,9 @@ jobs:
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
         
-        # Generate version header
-        make version-update
-        
+        # Clean first, then generate version header
         make clean-ci
+        make version-update
         make all
         
         # Verify binary was created

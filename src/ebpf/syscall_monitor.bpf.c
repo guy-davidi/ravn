@@ -28,7 +28,7 @@ struct {
 
 // Simple test function that generates events
 SEC("kprobe/do_sys_openat2")
-int trace_syscall_enter(struct pt_regs* ctx) {
+int trace_syscall_enter(struct pt_regs* ctx __attribute__((unused))) {
 	struct syscall_event* event;
 
 	// Reserve space in ring buffer

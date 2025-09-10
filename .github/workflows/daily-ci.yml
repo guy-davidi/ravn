@@ -106,10 +106,9 @@ jobs:
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
         
-        # Generate version header
-        make version-update
-        
+        # Clean first, then generate version header
         make clean-ci
+        make version-update
         make all
         
         # Verify binary was created
@@ -140,11 +139,9 @@ jobs:
         # Create codegen directory before build
         mkdir -p src/daemon/codegen
         
-        # Generate version header
-        make version-update
-        
         # Rebuild with verbose output to catch warnings
         make clean-ci
+        make version-update
         make all 2>&1 | tee build.log
         
         # Count warnings

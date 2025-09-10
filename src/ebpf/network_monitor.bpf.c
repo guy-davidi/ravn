@@ -35,7 +35,7 @@ static const __u64 EVENT_INTERVAL_NS = 1000000000; // 1 second
 
 // Simple test function that generates network events (rate limited)
 SEC("kprobe/tcp_sendmsg")
-int trace_network_send(struct pt_regs* ctx) {
+int trace_network_send(struct pt_regs* ctx __attribute__((unused))) {
 	__u64 current_time = bpf_ktime_get_ns();
 
 	// Rate limit: only generate one event per second
