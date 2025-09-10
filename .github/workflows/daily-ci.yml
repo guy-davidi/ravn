@@ -97,6 +97,39 @@ jobs:
         echo "RAVN_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
         echo "RAVN_MAGIC=${NEW_MAGIC}" >> $GITHUB_ENV
         echo "Generated version: ${NEW_VERSION}"
+        
+        # Create version header for C code (CRITICAL: Must be done before build)
+        DATE_PART=$(echo $NEW_VERSION | cut -d'.' -f1)
+        MAGIC_PART=$(echo $NEW_VERSION | cut -d'.' -f2)
+        
+        YEAR=$(echo $DATE_PART | cut -c1-4)
+        MONTH=$(echo $DATE_PART | cut -c5-6)
+        DAY=$(echo $DATE_PART | cut -c7-8)
+        
+        # Remove leading zeros to avoid octal constant issues
+        YEAR_NUM=$((10#$YEAR))
+        MONTH_NUM=$((10#$MONTH))
+        DAY_NUM=$((10#$DAY))
+        MAGIC_NUM=$((10#$MAGIC_PART))
+        
+        cat > src/version.h << EOF
+        #ifndef RAVN_VERSION_H
+        #define RAVN_VERSION_H
+        
+        #define RAVN_VERSION_MAJOR $YEAR_NUM
+        #define RAVN_VERSION_MINOR $MONTH_NUM
+        #define RAVN_VERSION_PATCH $DAY_NUM
+        #define RAVN_VERSION_MAGIC $MAGIC_NUM
+        #define RAVN_VERSION_STRING "$NEW_VERSION"
+        #define RAVN_BUILD_DATE "$RAVN_BUILD_DATE"
+        #define RAVN_BUILD_TIME "$RAVN_BUILD_TIME"
+        #define RAVN_COMMIT_SHA "$RAVN_COMMIT_SHA"
+        
+        #endif // RAVN_VERSION_H
+        EOF
+        
+        echo "Version header created:"
+        cat src/version.h
     
     - name: Build RAVN
       run: |
@@ -181,40 +214,6 @@ jobs:
           echo "Created tag: $TAG_NAME"
         fi
     
-    - name: Update version file
-      run: |
-        # Create version header for C code
-        DATE_PART=$(echo $RAVN_VERSION | cut -d'.' -f1)
-        MAGIC_PART=$(echo $RAVN_VERSION | cut -d'.' -f2)
-        
-        YEAR=$(echo $DATE_PART | cut -c1-4)
-        MONTH=$(echo $DATE_PART | cut -c5-6)
-        DAY=$(echo $DATE_PART | cut -c7-8)
-        
-        # Remove leading zeros to avoid octal constant issues
-        YEAR_NUM=$((10#$YEAR))
-        MONTH_NUM=$((10#$MONTH))
-        DAY_NUM=$((10#$DAY))
-        MAGIC_NUM=$((10#$MAGIC_PART))
-        
-        cat > src/version.h << EOF
-        #ifndef RAVN_VERSION_H
-        #define RAVN_VERSION_H
-        
-        #define RAVN_VERSION_MAJOR $YEAR_NUM
-        #define RAVN_VERSION_MINOR $MONTH_NUM
-        #define RAVN_VERSION_PATCH $DAY_NUM
-        #define RAVN_VERSION_MAGIC $MAGIC_NUM
-        #define RAVN_VERSION_STRING "$RAVN_VERSION"
-        #define RAVN_BUILD_DATE "$RAVN_BUILD_DATE"
-        #define RAVN_BUILD_TIME "$RAVN_BUILD_TIME"
-        #define RAVN_COMMIT_SHA "$RAVN_COMMIT_SHA"
-        
-        #endif // RAVN_VERSION_H
-        EOF
-        
-        echo "Version header created:"
-        cat src/version.h
     
     - name: Commit version updates
       if: success() && github.event_name == 'schedule'
