@@ -32,6 +32,10 @@ env:
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     
     steps:
     - name: Checkout code
@@ -272,8 +276,24 @@ jobs:
         echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
     
+    - name: Verify GitHub Token Permissions
+      run: |
+        echo "Verifying GitHub token permissions..."
+        # Check if we can access the repository
+        curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/${{ github.repository }} | jq -r '.permissions'
+        
+        # Check if we can create releases
+        echo "Checking release permissions..."
+        curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/${{ github.repository }}/releases \
+             -X POST -d '{"tag_name":"test-permission-check","name":"Test","body":"Test release","draft":true}' \
+             || echo "Permission check completed (expected to fail for test release)"
+    
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ env.RAVN_VERSION }}
         name: RAVN Security Platform v${{ env.RAVN_VERSION }}
@@ -288,6 +308,7 @@ jobs:
           release-assets/ravn-${{ env.RAVN_VERSION }}-linux-x86_64.md5
           release-assets/install-ravn-${{ env.RAVN_VERSION }}.sh
         token: ${{ secrets.GITHUB_TOKEN }}
+        fail_on_unmatched_files: true
     
     - name: Release summary
       if: always()
