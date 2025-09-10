@@ -13,6 +13,7 @@ struct syscall_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tid;
+    __u32 event_type;
     __u32 syscall_nr;
     __s64 retval;
     char comm[16];
@@ -40,6 +41,7 @@ int trace_syscall_enter(struct pt_regs *ctx) {
     event->timestamp = bpf_ktime_get_ns();
     event->pid = bpf_get_current_pid_tgid() >> 32;
     event->tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
+    event->event_type = 257; // openat syscall number
     event->syscall_nr = 257; // openat syscall number
     event->retval = 0;
     

@@ -10,6 +10,7 @@ struct file_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tid;
+    __u32 event_type;
     __u32 operation;
     __u32 flags;
     __u32 mode;
@@ -38,6 +39,7 @@ int trace_file_event(struct pt_regs *ctx) {
     event->timestamp = bpf_ktime_get_ns();
     event->pid = bpf_get_current_pid_tgid() >> 32;
     event->tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
+    event->event_type = 1; // File open
     event->operation = 1; // Open
     event->flags = 0;     // O_RDONLY
     event->mode = 0644;   // Default mode
