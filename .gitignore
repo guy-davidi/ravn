@@ -4,9 +4,9 @@ artifacts/
 *.so
 *.a
 
-# Version files (generated)
-src/version.h
-.last_version
+# Version files (generated) - Note: These are tracked for CI version management
+# src/version.h
+# .last_version
 
 # Model files (generated)
 src/daemon/codegen/model_weights.h
