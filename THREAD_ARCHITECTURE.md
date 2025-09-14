@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TB
-    subgraph MAIN_PROCESS["🚀 MAIN PROCESS (ravn)"]
+    subgraph MAIN_PROCESS[" MAIN PROCESS (ravn)"]
         subgraph MAIN_THREAD["Main Thread"]
             MS["Mode Selection<br/>• Parse arguments<br/>• Initialize components<br/>• Start threads<br/>• Health monitoring"]
         end
@@ -26,7 +26,7 @@ graph TB
         end
     end
     
-    subgraph KERNEL_SPACE["🔧 KERNEL SPACE"]
+    subgraph KERNEL_SPACE[" KERNEL SPACE"]
         subgraph EBPF_PROGRAMS["eBPF Programs"]
             SYS["syscall_monitor.bpf<br/>• Trace syscalls<br/>• Ring buffer: syscall_events"]
             NET["network_monitor.bpf<br/>• Monitor network I/O<br/>• Ring buffer: network_events"]
@@ -42,7 +42,7 @@ graph TB
         end
     end
     
-    subgraph EXTERNAL["🌐 EXTERNAL DEPENDENCIES"]
+    subgraph EXTERNAL[" EXTERNAL DEPENDENCIES"]
         RS["Redis Server<br/>• events:raw (LPUSH/RPOP)<br/>• threat_level (SET)<br/>• threat_updates (PUBLISH)"]
         LB["libbpf Library<br/>• eBPF program loading<br/>• Ring buffer management<br/>• Zero-copy I/O"]
     end
@@ -101,12 +101,12 @@ graph TB
 
 ## Thread Responsibilities
 
-### 🚀 Main Process
+###  Main Process
 - **Process ID**: Single PID for entire RAVN daemon
 - **Main Thread**: Initialization, coordination, and health monitoring
 - **Child Threads**: 4 specialized threads for different functions
 
-### 🔧 eBPF Handler Thread
+###  eBPF Handler Thread
 - **Function**: `ring_buffer_poll_thread()`
 - **Responsibilities**:
   - Continuously poll all 4 eBPF ring buffers
@@ -114,7 +114,7 @@ graph TB
   - Send events to Redis via Redis Client Thread
   - Handle ring buffer errors and reconnections
 
-### 🤖 AI Analysis Thread  
+###  AI Analysis Thread  
 - **Function**: `ai_analysis_thread()`
 - **Responsibilities**:
   - Read events from Redis queue (`events:raw`)
@@ -124,7 +124,7 @@ graph TB
   - Publish threat updates via Redis pub/sub
   - Run every 1 second
 
-### 🔗 Redis Client Thread
+###  Redis Client Thread
 - **Function**: `redis_operations_thread()`
 - **Responsibilities**:
   - Maintain Redis connection
@@ -134,7 +134,7 @@ graph TB
   - Handle `PUBLISH` operations for real-time updates
   - Automatic reconnection on failures
 
-### 🏥 Health Monitoring Thread
+###  Health Monitoring Thread
 - **Function**: `health_monitor_thread()`
 - **Responsibilities**:
   - Monitor all thread health and status
