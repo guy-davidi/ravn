@@ -139,63 +139,45 @@ async def get_recent_events(limit: int = 100):
     try:
         redis_conn = await get_redis()
         
-        # Get recent events from different streams
+        # Get recent events from the actual Redis key
         events = []
         
-        # Memory events
-        memory_events = await redis_conn.lrange("ravn:events:memory", 0, limit-1)
-        for event in memory_events:
-            try:
-                event_data = json.loads(event)
-                events.append({
-                    "timestamp": event_data.get("timestamp", time.time()),
-                    "type": "memory",
-                    "data": event_data,
-                    "source": "eBPF"
-                })
-            except:
-                continue
+        # Get events from events:raw key based on data type
+        events_type = await redis_conn.type("events:raw")
+        raw_events = []
         
-        # Process events
-        process_events = await redis_conn.lrange("ravn:events:process", 0, limit-1)
-        for event in process_events:
-            try:
-                event_data = json.loads(event)
-                events.append({
-                    "timestamp": event_data.get("timestamp", time.time()),
-                    "type": "process",
-                    "data": event_data,
-                    "source": "eBPF"
-                })
-            except:
-                continue
+        if events_type == "list":
+            raw_events = await redis_conn.lrange("events:raw", 0, limit-1)
+        elif events_type == "string":
+            event_data = await redis_conn.get("events:raw")
+            if event_data:
+                raw_events = [event_data]
+        elif events_type == "set":
+            raw_events = await redis_conn.smembers("events:raw")
+            raw_events = list(raw_events)[:limit]
         
-        # Kernel events
-        kernel_events = await redis_conn.lrange("ravn:events:kernel", 0, limit-1)
-        for event in kernel_events:
+        for event in raw_events:
             try:
                 event_data = json.loads(event)
+                # Determine event type from the data
+                event_type = "unknown"
+                if "memory" in str(event_data).lower():
+                    event_type = "memory"
+                elif "process" in str(event_data).lower() or "exec" in str(event_data).lower():
+                    event_type = "process"
+                elif "kernel" in str(event_data).lower() or "module" in str(event_data).lower():
+                    event_type = "kernel"
+                elif "performance" in str(event_data).lower() or "cpu" in str(event_data).lower():
+                    event_type = "performance"
+                
                 events.append({
                     "timestamp": event_data.get("timestamp", time.time()),
-                    "type": "kernel",
+                    "type": event_type,
                     "data": event_data,
                     "source": "eBPF"
                 })
-            except:
-                continue
-        
-        # Performance events
-        perf_events = await redis_conn.lrange("ravn:events:performance", 0, limit-1)
-        for event in perf_events:
-            try:
-                event_data = json.loads(event)
-                events.append({
-                    "timestamp": event_data.get("timestamp", time.time()),
-                    "type": "performance",
-                    "data": event_data,
-                    "source": "eBPF"
-                })
-            except:
+            except Exception as e:
+                logger.debug(f"Error parsing event: {e}")
                 continue
         
         # Sort by timestamp (newest first)
@@ -212,21 +194,33 @@ async def get_ai_analyses(limit: int = 50):
     try:
         redis_conn = await get_redis()
         
-        # Get AI analysis results
-        analyses = await redis_conn.lrange("ravn:ai:analyses", 0, limit-1)
-        results = []
+        # Get AI analysis results from threat:current key based on data type
+        threat_type = await redis_conn.type("threat:current")
+        analyses = []
         
+        if threat_type == "list":
+            analyses = await redis_conn.lrange("threat:current", 0, limit-1)
+        elif threat_type == "string":
+            analysis_data = await redis_conn.get("threat:current")
+            if analysis_data:
+                analyses = [analysis_data]
+        elif threat_type == "set":
+            analyses = await redis_conn.smembers("threat:current")
+            analyses = list(analyses)[:limit]
+        
+        results = []
         for analysis in analyses:
             try:
                 analysis_data = json.loads(analysis)
                 results.append({
                     "timestamp": analysis_data.get("timestamp", time.time()),
-                    "threat_score": analysis_data.get("threat_score", 0.0),
-                    "analysis_type": analysis_data.get("analysis_type", "unknown"),
-                    "details": analysis_data.get("details", {}),
+                    "threat_score": analysis_data.get("threat_score", analysis_data.get("score", 0.0)),
+                    "analysis_type": analysis_data.get("analysis_type", "threat_analysis"),
+                    "details": analysis_data.get("details", analysis_data),
                     "recommendations": analysis_data.get("recommendations", [])
                 })
-            except:
+            except Exception as e:
+                logger.debug(f"Error parsing AI analysis: {e}")
                 continue
         
         # Sort by timestamp (newest first)
@@ -247,12 +241,83 @@ async def get_system_stats():
         all_keys = await redis_conn.keys("*")
         logger.info(f"Redis keys found: {all_keys}")
         
-        # Get event counts
-        memory_count = await redis_conn.llen("ravn:events:memory")
-        process_count = await redis_conn.llen("ravn:events:process")
-        kernel_count = await redis_conn.llen("ravn:events:kernel")
-        perf_count = await redis_conn.llen("ravn:events:performance")
-        ai_count = await redis_conn.llen("ravn:ai:analyses")
+        # Check data types of Redis keys
+        events_type = await redis_conn.type("events:raw")
+        threat_type = await redis_conn.type("threat:current")
+        
+        logger.info(f"Redis key types - events:raw: {events_type}, threat:current: {threat_type}")
+        
+        # Get event counts based on data type
+        events_count = 0
+        threat_count = 0
+        
+        if events_type == "list":
+            events_count = await redis_conn.llen("events:raw")
+        elif events_type == "string":
+            events_data = await redis_conn.get("events:raw")
+            if events_data:
+                events_count = 1  # Single string value
+                logger.info(f"Sample event (string): {events_data}")
+        elif events_type == "set":
+            events_count = await redis_conn.scard("events:raw")
+        
+        if threat_type == "list":
+            threat_count = await redis_conn.llen("threat:current")
+        elif threat_type == "string":
+            threat_data = await redis_conn.get("threat:current")
+            if threat_data:
+                threat_count = 1  # Single string value
+                logger.info(f"Sample threat (string): {threat_data}")
+        elif threat_type == "set":
+            threat_count = await redis_conn.scard("threat:current")
+        
+        # Parse events to categorize by type
+        memory_count = 0
+        process_count = 0
+        kernel_count = 0
+        perf_count = 0
+        
+        if events_count > 0:
+            # Get a sample of events to categorize
+            sample_size = min(100, events_count)  # Sample up to 100 events
+            if events_type == "list":
+                sample_events = await redis_conn.lrange("events:raw", 0, sample_size-1)
+            elif events_type == "string":
+                event_data = await redis_conn.get("events:raw")
+                sample_events = [event_data] if event_data else []
+            elif events_type == "set":
+                sample_events = await redis_conn.smembers("events:raw")
+                sample_events = list(sample_events)[:sample_size]
+            
+            # Count event types in sample
+            for event in sample_events:
+                try:
+                    event_data = json.loads(event)
+                    event_str = str(event_data).lower()
+                    
+                    if "memory" in event_str or "mmap" in event_str or "munmap" in event_str:
+                        memory_count += 1
+                    elif "process" in event_str or "exec" in event_str or "fork" in event_str or "exit" in event_str:
+                        process_count += 1
+                    elif "kernel" in event_str or "module" in event_str or "init_module" in event_str:
+                        kernel_count += 1
+                    elif "performance" in event_str or "cpu" in event_str or "getpid" in event_str or "brk" in event_str:
+                        perf_count += 1
+                    else:
+                        # If we can't categorize, distribute evenly
+                        memory_count += 1
+                except:
+                    continue
+            
+            # Scale up the counts based on sample
+            if sample_size > 0:
+                scale_factor = events_count / sample_size
+                memory_count = int(memory_count * scale_factor)
+                process_count = int(process_count * scale_factor)
+                kernel_count = int(kernel_count * scale_factor)
+                perf_count = int(perf_count * scale_factor)
+        
+        ai_count = threat_count
         
         logger.info(f"Event counts - Memory: {memory_count}, Process: {process_count}, Kernel: {kernel_count}, Performance: {perf_count}, AI: {ai_count}")
         
@@ -348,25 +413,57 @@ async def redis_monitor():
                 await asyncio.sleep(1)  # Wait longer if no connections
                 continue
                 
-            # Check for new events in all streams
-            for stream in ["ravn:events:memory", "ravn:events:process", "ravn:events:kernel", "ravn:events:performance"]:
-                # Get latest event
-                events = await redis_conn.lrange(stream, 0, 0)
-                if events:
-                    try:
-                        event_data = json.loads(events[0])
-                        await manager.broadcast({
-                            "type": "new_event",
-                            "stream": stream.split(":")[-1],
-                            "data": event_data,
-                            "timestamp": time.time()
-                        })
-                    except Exception as e:
-                        logger.debug(f"Error processing event from {stream}: {e}")
-                        continue
+            # Check for new events in events:raw
+            events_type = await redis_conn.type("events:raw")
+            events = []
             
-            # Check for new AI analyses
-            analyses = await redis_conn.lrange("ravn:ai:analyses", 0, 0)
+            if events_type == "list":
+                events = await redis_conn.lrange("events:raw", 0, 0)
+            elif events_type == "string":
+                event_data = await redis_conn.get("events:raw")
+                if event_data:
+                    events = [event_data]
+            elif events_type == "set":
+                events = await redis_conn.smembers("events:raw")
+                events = list(events)[:1]
+            
+            if events:
+                try:
+                    event_data = json.loads(events[0])
+                    # Determine event type
+                    event_type = "unknown"
+                    if "memory" in str(event_data).lower():
+                        event_type = "memory"
+                    elif "process" in str(event_data).lower() or "exec" in str(event_data).lower():
+                        event_type = "process"
+                    elif "kernel" in str(event_data).lower() or "module" in str(event_data).lower():
+                        event_type = "kernel"
+                    elif "performance" in str(event_data).lower() or "cpu" in str(event_data).lower():
+                        event_type = "performance"
+                    
+                    await manager.broadcast({
+                        "type": "new_event",
+                        "stream": event_type,
+                        "data": event_data,
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    logger.debug(f"Error processing event: {e}")
+            
+            # Check for new AI analyses in threat:current
+            threat_type = await redis_conn.type("threat:current")
+            analyses = []
+            
+            if threat_type == "list":
+                analyses = await redis_conn.lrange("threat:current", 0, 0)
+            elif threat_type == "string":
+                analysis_data = await redis_conn.get("threat:current")
+                if analysis_data:
+                    analyses = [analysis_data]
+            elif threat_type == "set":
+                analyses = await redis_conn.smembers("threat:current")
+                analyses = list(analyses)[:1]
+            
             if analyses:
                 try:
                     analysis_data = json.loads(analyses[0])
@@ -377,7 +474,6 @@ async def redis_monitor():
                     })
                 except Exception as e:
                     logger.debug(f"Error processing AI analysis: {e}")
-                    continue
                     
         except Exception as e:
             logger.error(f"Error in redis_monitor: {e}")
