@@ -24,11 +24,19 @@ static struct bpf_object* syscall_obj = NULL;
 static struct bpf_object* network_obj = NULL;
 static struct bpf_object* security_obj = NULL;
 static struct bpf_object* file_obj = NULL;
+static struct bpf_object* memory_obj = NULL;
+static struct bpf_object* process_obj = NULL;
+static struct bpf_object* kernel_obj = NULL;
+static struct bpf_object* performance_obj = NULL;
 
 static struct ring_buffer* syscall_rb = NULL;
 static struct ring_buffer* network_rb = NULL;
 static struct ring_buffer* security_rb = NULL;
 static struct ring_buffer* file_rb = NULL;
+static struct ring_buffer* memory_rb = NULL;
+static struct ring_buffer* process_rb = NULL;
+static struct ring_buffer* kernel_rb = NULL;
+static struct ring_buffer* performance_rb = NULL;
 
 static int monitoring_active = 0;
 static pthread_t monitoring_thread;
@@ -218,6 +226,181 @@ static int handle_file_event(void* ctx, void* data, size_t data_sz) {
 	return 0;
 }
 
+static int handle_memory_event(void* ctx, void* data, size_t data_sz) {
+	const struct memory_event* event = (const struct memory_event*)data;
+
+	if (data_sz < sizeof(*event)) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid memory event size: %zu", data_sz);
+		return 0;
+	}
+
+	// Convert to generic ravn_event
+	struct ravn_event ravn_event = {.timestamp = event->timestamp,
+					.pid = event->pid,
+					.tid = event->tid,
+					.event_type = event->event_type,
+					.event_category = 5, // Memory category
+					.comm = {0}};
+
+	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
+
+	// Create JSON data
+	snprintf(ravn_event.data, sizeof(ravn_event.data),
+		 "{\"event_type\":\"%s\",\"address\":\"0x%lx\",\"size\":%lu,"
+		 "\"permissions\":%u,\"flags\":%u,\"filename\":\"%s\","
+		 "\"real_ebpf\":true}",
+		 get_memory_event_name(event->event_type), event->address, event->size,
+		 event->permissions, event->flags, event->filename);
+
+	// Send to Redis
+	if (global_redis_conn_ptr) {
+		int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+		if (result != 0) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send memory event: %s",
+					 redis_get_last_error());
+		}
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Memory event: PID=%u, Type=%s, Address=0x%lx, Size=%lu",
+			event->pid, get_memory_event_name(event->event_type), event->address,
+			event->size);
+
+	return 0;
+}
+
+static int handle_process_event(void* ctx, void* data, size_t data_sz) {
+	const struct process_event* event = (const struct process_event*)data;
+
+	if (data_sz < sizeof(*event)) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid process event size: %zu", data_sz);
+		return 0;
+	}
+
+	// Convert to generic ravn_event
+	struct ravn_event ravn_event = {.timestamp = event->timestamp,
+					.pid = event->pid,
+					.tid = event->tid,
+					.event_type = event->event_type,
+					.event_category = 6, // Process category
+					.comm = {0}};
+
+	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
+
+	// Create JSON data
+	snprintf(ravn_event.data, sizeof(ravn_event.data),
+		 "{\"event_type\":\"%s\",\"ppid\":%u,\"uid\":%u,\"gid\":%u,"
+		 "\"euid\":%u,\"egid\":%u,\"suid\":%u,\"sgid\":%u,"
+		 "\"capabilities\":%u,\"filename\":\"%s\",\"working_dir\":\"%s\","
+		 "\"command_line\":\"%s\",\"real_ebpf\":true}",
+		 get_process_event_name(event->event_type), event->ppid, event->uid, event->gid,
+		 event->euid, event->egid, event->suid, event->sgid, event->capabilities,
+		 event->filename, event->working_dir, event->command_line);
+
+	// Send to Redis
+	if (global_redis_conn_ptr) {
+		int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+		if (result != 0) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send process event: %s",
+					 redis_get_last_error());
+		}
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Process event: PID=%u, Type=%s, PPID=%u, File=%s",
+			event->pid, get_process_event_name(event->event_type), event->ppid,
+			event->filename);
+
+	return 0;
+}
+
+static int handle_kernel_event(void* ctx, void* data, size_t data_sz) {
+	const struct kernel_event* event = (const struct kernel_event*)data;
+
+	if (data_sz < sizeof(*event)) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid kernel event size: %zu", data_sz);
+		return 0;
+	}
+
+	// Convert to generic ravn_event
+	struct ravn_event ravn_event = {.timestamp = event->timestamp,
+					.pid = event->pid,
+					.tid = event->tid,
+					.event_type = event->event_type,
+					.event_category = 7, // Kernel category
+					.comm = {0}};
+
+	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
+
+	// Create JSON data
+	snprintf(ravn_event.data, sizeof(ravn_event.data),
+		 "{\"event_type\":\"%s\",\"cpu_id\":%u,\"address\":\"0x%lx\","
+		 "\"size\":%lu,\"flags\":%u,\"module_name\":\"%s\","
+		 "\"function_name\":\"%s\",\"filename\":\"%s\",\"real_ebpf\":true}",
+		 get_kernel_event_name(event->event_type), event->cpu_id, event->address,
+		 event->size, event->flags, event->module_name, event->function_name,
+		 event->filename);
+
+	// Send to Redis
+	if (global_redis_conn_ptr) {
+		int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+		if (result != 0) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send kernel event: %s",
+					 redis_get_last_error());
+		}
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Kernel event: PID=%u, Type=%s, CPU=%u, Module=%s",
+			event->pid, get_kernel_event_name(event->event_type), event->cpu_id,
+			event->module_name);
+
+	return 0;
+}
+
+static int handle_performance_event(void* ctx, void* data, size_t data_sz) {
+	const struct performance_event* event = (const struct performance_event*)data;
+
+	if (data_sz < sizeof(*event)) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Invalid performance event size: %zu", data_sz);
+		return 0;
+	}
+
+	// Convert to generic ravn_event
+	struct ravn_event ravn_event = {.timestamp = event->timestamp,
+					.pid = event->pid,
+					.tid = event->tid,
+					.event_type = event->event_type,
+					.event_category = 8, // Performance category
+					.comm = {0}};
+
+	strncpy(ravn_event.comm, event->comm, sizeof(ravn_event.comm) - 1);
+	ravn_event.comm[sizeof(ravn_event.comm) - 1] = '\0';
+
+	// Create JSON data
+	snprintf(ravn_event.data, sizeof(ravn_event.data),
+		 "{\"event_type\":\"%s\",\"cpu_id\":%u,\"value\":%lu,"
+		 "\"threshold\":%lu,\"flags\":%u,\"device_name\":\"%s\","
+		 "\"metric_name\":\"%s\",\"real_ebpf\":true}",
+		 get_performance_event_name(event->event_type), event->cpu_id, event->value,
+		 event->threshold, event->flags, event->device_name, event->metric_name);
+
+	// Send to Redis
+	if (global_redis_conn_ptr) {
+		int result = redis_send_event(global_redis_conn_ptr, &ravn_event);
+		if (result != 0) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to send performance event: %s",
+					 redis_get_last_error());
+		}
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Performance event: PID=%u, Type=%s, CPU=%u, Value=%lu",
+			event->pid, get_performance_event_name(event->event_type), event->cpu_id,
+			event->value);
+
+	return 0;
+}
+
 // Ring buffer polling thread
 static void* ring_buffer_poll_thread(void* arg) {
 	(void)arg;
@@ -249,6 +432,31 @@ static void* ring_buffer_poll_thread(void* arg) {
 		err = ring_buffer__poll(file_rb, 1000);
 		if (err < 0 && err != -EINTR) {
 			LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling file ring buffer: %s",
+					 strerror(-err));
+		}
+
+		err = ring_buffer__poll(memory_rb, 1000);
+		if (err < 0 && err != -EINTR) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling memory ring buffer: %s",
+					 strerror(-err));
+		}
+
+		err = ring_buffer__poll(process_rb, 1000);
+		if (err < 0 && err != -EINTR) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling process ring buffer: %s",
+					 strerror(-err));
+		}
+
+		err = ring_buffer__poll(kernel_rb, 1000);
+		if (err < 0 && err != -EINTR) {
+			LOG_ERROR_MODULE("eBPF-HANDLER", "Error polling kernel ring buffer: %s",
+					 strerror(-err));
+		}
+
+		err = ring_buffer__poll(performance_rb, 1000);
+		if (err < 0 && err != -EINTR) {
+			LOG_ERROR_MODULE("eBPF-HANDLER",
+					 "Error polling performance ring buffer: %s",
 					 strerror(-err));
 		}
 	}
@@ -329,6 +537,74 @@ static int load_ebpf_programs(void) {
 		return -1;
 	}
 
+	// Load memory monitor
+	memory_obj = bpf_object__open_file("artifacts/memory_monitor.bpf.o", NULL);
+	if (libbpf_get_error(memory_obj)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(memory_obj), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open memory monitor: %s", err_buf);
+		return -1;
+	}
+
+	err = bpf_object__load(memory_obj);
+	if (err) {
+		char err_buf[256];
+		libbpf_strerror(err, err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load memory monitor: %s", err_buf);
+		return -1;
+	}
+
+	// Load process monitor
+	process_obj = bpf_object__open_file("artifacts/process_monitor.bpf.o", NULL);
+	if (libbpf_get_error(process_obj)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(process_obj), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open process monitor: %s", err_buf);
+		return -1;
+	}
+
+	err = bpf_object__load(process_obj);
+	if (err) {
+		char err_buf[256];
+		libbpf_strerror(err, err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load process monitor: %s", err_buf);
+		return -1;
+	}
+
+	// Load kernel monitor
+	kernel_obj = bpf_object__open_file("artifacts/kernel_monitor.bpf.o", NULL);
+	if (libbpf_get_error(kernel_obj)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(kernel_obj), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open kernel monitor: %s", err_buf);
+		return -1;
+	}
+
+	err = bpf_object__load(kernel_obj);
+	if (err) {
+		char err_buf[256];
+		libbpf_strerror(err, err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load kernel monitor: %s", err_buf);
+		return -1;
+	}
+
+	// Load performance monitor
+	performance_obj = bpf_object__open_file("artifacts/performance_monitor.bpf.o", NULL);
+	if (libbpf_get_error(performance_obj)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(performance_obj), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to open performance monitor: %s", err_buf);
+		return -1;
+	}
+
+	err = bpf_object__load(performance_obj);
+	if (err) {
+		char err_buf[256];
+		libbpf_strerror(err, err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to load performance monitor: %s", err_buf);
+		return -1;
+	}
+
 	LOG_INFO_MODULE("eBPF-HANDLER", "All eBPF programs loaded successfully");
 	return 0;
 }
@@ -378,9 +654,68 @@ static int attach_ebpf_programs(void) {
 		if (libbpf_get_error(link)) {
 			char err_buf[256];
 			libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
-			LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s",
+			LOG_WARN_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s (continuing)",
 					 bpf_program__name(prog), err_buf);
-			return -1;
+		} else {
+			LOG_INFO_MODULE("eBPF-HANDLER", "Successfully attached program %s",
+					 bpf_program__name(prog));
+		}
+	}
+
+	// Attach memory programs
+	bpf_object__for_each_program(prog, memory_obj) {
+		struct bpf_link* link = bpf_program__attach(prog);
+		if (libbpf_get_error(link)) {
+			char err_buf[256];
+			libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+			LOG_WARN_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s (continuing)",
+					 bpf_program__name(prog), err_buf);
+		} else {
+			LOG_INFO_MODULE("eBPF-HANDLER", "Successfully attached program %s",
+					 bpf_program__name(prog));
+		}
+	}
+
+	// Attach process programs
+	bpf_object__for_each_program(prog, process_obj) {
+		struct bpf_link* link = bpf_program__attach(prog);
+		if (libbpf_get_error(link)) {
+			char err_buf[256];
+			libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+			LOG_WARN_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s (continuing)",
+					 bpf_program__name(prog), err_buf);
+		} else {
+			LOG_INFO_MODULE("eBPF-HANDLER", "Successfully attached program %s",
+					 bpf_program__name(prog));
+		}
+	}
+
+	// Attach kernel programs
+	bpf_object__for_each_program(prog, kernel_obj) {
+		struct bpf_link* link = bpf_program__attach(prog);
+		if (libbpf_get_error(link)) {
+			char err_buf[256];
+			libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+			LOG_WARN_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s (continuing)",
+					 bpf_program__name(prog), err_buf);
+		} else {
+			LOG_INFO_MODULE("eBPF-HANDLER", "Successfully attached program %s",
+					 bpf_program__name(prog));
+		}
+	}
+
+	// Attach performance programs
+	bpf_object__for_each_program(prog, performance_obj) {
+		struct bpf_link* link = bpf_program__attach(prog);
+		if (libbpf_get_error(link)) {
+			char err_buf[256];
+			libbpf_strerror(libbpf_get_error(link), err_buf, sizeof(err_buf));
+			LOG_WARN_MODULE("eBPF-HANDLER", "Failed to attach program %s: %s (continuing)",
+					 bpf_program__name(prog), err_buf);
+			// Continue instead of failing - some programs may not be attachable
+		} else {
+			LOG_INFO_MODULE("eBPF-HANDLER", "Successfully attached program %s",
+					 bpf_program__name(prog));
 		}
 	}
 
@@ -455,6 +790,70 @@ static int create_ring_buffers(void) {
 		return -1;
 	}
 
+	// Create memory ring buffer
+	map = bpf_object__find_map_by_name(memory_obj, "memory_events");
+	if (!map) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find memory_events map");
+		return -1;
+	}
+
+	memory_rb = ring_buffer__new(bpf_map__fd(map), handle_memory_event, NULL, NULL);
+	if (libbpf_get_error(memory_rb)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(memory_rb), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create memory ring buffer: %s",
+				 err_buf);
+		return -1;
+	}
+
+	// Create process ring buffer
+	map = bpf_object__find_map_by_name(process_obj, "process_events");
+	if (!map) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find process_events map");
+		return -1;
+	}
+
+	process_rb = ring_buffer__new(bpf_map__fd(map), handle_process_event, NULL, NULL);
+	if (libbpf_get_error(process_rb)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(process_rb), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create process ring buffer: %s",
+				 err_buf);
+		return -1;
+	}
+
+	// Create kernel ring buffer
+	map = bpf_object__find_map_by_name(kernel_obj, "kernel_events");
+	if (!map) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find kernel_events map");
+		return -1;
+	}
+
+	kernel_rb = ring_buffer__new(bpf_map__fd(map), handle_kernel_event, NULL, NULL);
+	if (libbpf_get_error(kernel_rb)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(kernel_rb), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create kernel ring buffer: %s",
+				 err_buf);
+		return -1;
+	}
+
+	// Create performance ring buffer
+	map = bpf_object__find_map_by_name(performance_obj, "performance_events");
+	if (!map) {
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to find performance_events map");
+		return -1;
+	}
+
+	performance_rb = ring_buffer__new(bpf_map__fd(map), handle_performance_event, NULL, NULL);
+	if (libbpf_get_error(performance_rb)) {
+		char err_buf[256];
+		libbpf_strerror(libbpf_get_error(performance_rb), err_buf, sizeof(err_buf));
+		LOG_ERROR_MODULE("eBPF-HANDLER", "Failed to create performance ring buffer: %s",
+				 err_buf);
+		return -1;
+	}
+
 	LOG_INFO_MODULE("eBPF-HANDLER", "All ring buffers created successfully");
 	return 0;
 }
@@ -525,6 +924,26 @@ void cleanup_ebpf_handlers(void) {
 		file_rb = NULL;
 	}
 
+	if (memory_rb) {
+		ring_buffer__free(memory_rb);
+		memory_rb = NULL;
+	}
+
+	if (process_rb) {
+		ring_buffer__free(process_rb);
+		process_rb = NULL;
+	}
+
+	if (kernel_rb) {
+		ring_buffer__free(kernel_rb);
+		kernel_rb = NULL;
+	}
+
+	if (performance_rb) {
+		ring_buffer__free(performance_rb);
+		performance_rb = NULL;
+	}
+
 	// Cleanup eBPF objects
 	if (syscall_obj) {
 		bpf_object__close(syscall_obj);
@@ -544,6 +963,26 @@ void cleanup_ebpf_handlers(void) {
 	if (file_obj) {
 		bpf_object__close(file_obj);
 		file_obj = NULL;
+	}
+
+	if (memory_obj) {
+		bpf_object__close(memory_obj);
+		memory_obj = NULL;
+	}
+
+	if (process_obj) {
+		bpf_object__close(process_obj);
+		process_obj = NULL;
+	}
+
+	if (kernel_obj) {
+		bpf_object__close(kernel_obj);
+		kernel_obj = NULL;
+	}
+
+	if (performance_obj) {
+		bpf_object__close(performance_obj);
+		performance_obj = NULL;
 	}
 
 	LOG_INFO_MODULE("eBPF-HANDLER", "eBPF ring buffer monitoring stopped and cleaned up");
@@ -912,4 +1351,204 @@ char* event_to_json(const struct ravn_event* event) {
 		 event->comm, event->data);
 
 	return json_buffer;
+}
+
+// Process memory event
+int process_memory_event(const struct memory_event* event) {
+	if (!event) {
+		return -1;
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Memory event: PID=%d, Type=%s, Address=0x%lx, Size=%lu",
+			event->pid, get_memory_event_name(event->event_type), event->address,
+			event->size);
+	return 0;
+}
+
+// Process process event
+int process_process_event(const struct process_event* event) {
+	if (!event) {
+		return -1;
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Process event: PID=%d, Type=%s, PPID=%d, File=%s",
+			event->pid, get_process_event_name(event->event_type), event->ppid,
+			event->filename);
+	return 0;
+}
+
+// Process kernel event
+int process_kernel_event(const struct kernel_event* event) {
+	if (!event) {
+		return -1;
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Kernel event: PID=%d, Type=%s, CPU=%d, Module=%s",
+			event->pid, get_kernel_event_name(event->event_type), event->cpu_id,
+			event->module_name);
+	return 0;
+}
+
+// Process performance event
+int process_performance_event(const struct performance_event* event) {
+	if (!event) {
+		return -1;
+	}
+
+	LOG_INFO_MODULE("eBPF-HANDLER", "Performance event: PID=%d, Type=%s, CPU=%d, Value=%lu",
+			event->pid, get_performance_event_name(event->event_type), event->cpu_id,
+			event->value);
+	return 0;
+}
+
+// Get memory event name
+const char* get_memory_event_name(uint32_t event_type) {
+	switch (event_type) {
+	case MEM_EVENT_ALLOC:
+		return "memory_alloc";
+	case MEM_EVENT_FREE:
+		return "memory_free";
+	case MEM_EVENT_MMAP:
+		return "memory_mmap";
+	case MEM_EVENT_MUNMAP:
+		return "memory_munmap";
+	case MEM_EVENT_MPROTECT:
+		return "memory_mprotect";
+	case MEM_EVENT_ACCESS:
+		return "memory_access";
+	case MEM_EVENT_CORRUPTION:
+		return "memory_corruption";
+	case MEM_EVENT_HEAP_SPRAY:
+		return "memory_heap_spray";
+	case MEM_EVENT_STACK_OVERFLOW:
+		return "memory_stack_overflow";
+	case MEM_EVENT_PERMISSION_CHANGE:
+		return "memory_permission_change";
+	default:
+		return "unknown";
+	}
+}
+
+// Get process event name
+const char* get_process_event_name(uint32_t event_type) {
+	switch (event_type) {
+	case PROC_EVENT_SPAWN:
+		return "process_spawn";
+	case PROC_EVENT_EXIT:
+		return "process_exit";
+	case PROC_EVENT_EXEC:
+		return "process_exec";
+	case PROC_EVENT_FORK:
+		return "process_fork";
+	case PROC_EVENT_CLONE:
+		return "process_clone";
+	case PROC_EVENT_VFORK:
+		return "process_vfork";
+	case PROC_EVENT_SETUID:
+		return "process_setuid";
+	case PROC_EVENT_SETGID:
+		return "process_setgid";
+	case PROC_EVENT_SETRESUID:
+		return "process_setresuid";
+	case PROC_EVENT_SETRESGID:
+		return "process_setresgid";
+	case PROC_EVENT_CAPSET:
+		return "process_capset";
+	case PROC_EVENT_PRCTL:
+		return "process_prctl";
+	case PROC_EVENT_SIGNAL:
+		return "process_signal";
+	case PROC_EVENT_WORKING_DIR:
+		return "process_working_dir";
+	case PROC_EVENT_ENV_CHANGE:
+		return "process_env_change";
+	case PROC_EVENT_PRIORITY_CHANGE:
+		return "process_priority_change";
+	case PROC_EVENT_AFFINITY_CHANGE:
+		return "process_affinity_change";
+	case PROC_EVENT_NAMESPACE_CHANGE:
+		return "process_namespace_change";
+	case PROC_EVENT_IPC_OPERATION:
+		return "process_ipc_operation";
+	case PROC_EVENT_SESSION_CHANGE:
+		return "process_session_change";
+	default:
+		return "unknown";
+	}
+}
+
+// Get kernel event name
+const char* get_kernel_event_name(uint32_t event_type) {
+	switch (event_type) {
+	case KERNEL_MODULE_LOAD:
+		return "kernel_module_load";
+	case KERNEL_MODULE_UNLOAD:
+		return "kernel_module_unload";
+	case KERNEL_FUNCTION_CALL:
+		return "kernel_function_call";
+	case KERNEL_MEMORY_OP:
+		return "kernel_memory_op";
+	case KERNEL_SECURITY_VIOLATION:
+		return "kernel_security_violation";
+	case KERNEL_PERFORMANCE_EVENT:
+		return "kernel_performance_event";
+	case KERNEL_DEBUG_EVENT:
+		return "kernel_debug_event";
+	case KERNEL_INTERRUPT:
+		return "kernel_interrupt";
+	case KERNEL_SCHEDULER_EVENT:
+		return "kernel_scheduler_event";
+	case KERNEL_IO_EVENT:
+		return "kernel_io_event";
+	case KERNEL_NETWORK_EVENT:
+		return "kernel_network_event";
+	case KERNEL_FILESYSTEM_EVENT:
+		return "kernel_filesystem_event";
+	case KERNEL_DEVICE_EVENT:
+		return "kernel_device_event";
+	case KERNEL_TIMER_EVENT:
+		return "kernel_timer_event";
+	case KERNEL_SIGNAL_EVENT:
+		return "kernel_signal_event";
+	default:
+		return "unknown";
+	}
+}
+
+// Get performance event name
+const char* get_performance_event_name(uint32_t event_type) {
+	switch (event_type) {
+	case PERF_CPU_USAGE:
+		return "perf_cpu_usage";
+	case PERF_MEMORY_USAGE:
+		return "perf_memory_usage";
+	case PERF_DISK_IO:
+		return "perf_disk_io";
+	case PERF_NETWORK_IO:
+		return "perf_network_io";
+	case PERF_SYSTEM_LOAD:
+		return "perf_system_load";
+	case PERF_RESOURCE_CONTENTION:
+		return "perf_resource_contention";
+	case PERF_CACHE_MISS:
+		return "perf_cache_miss";
+	case PERF_INTERRUPT:
+		return "perf_interrupt";
+	case PERF_CONTEXT_SWITCH:
+		return "perf_context_switch";
+	case PERF_PAGE_FAULT:
+		return "perf_page_fault";
+	case PERF_SYSCALL_OVERHEAD:
+		return "perf_syscall_overhead";
+	case PERF_MEMORY_PRESSURE:
+		return "perf_memory_pressure";
+	case PERF_IO_WAIT:
+		return "perf_io_wait";
+	case PERF_CPU_FREQUENCY:
+		return "perf_cpu_frequency";
+	case PERF_THERMAL_EVENT:
+		return "perf_thermal_event";
+	default:
+		return "unknown";
+	}
 }

@@ -645,40 +645,41 @@ void extract_process_features(const struct event_sequence* sequence, float* feat
 
 		// Count process-related events based on event type
 		switch (event_type) {
-		case PROCESS_SPAWN: // Process creation (execve, fork, clone)
+		case PROC_EVENT_SPAWN: // Process creation (execve, fork, clone)
 			process_spawns++;
 			break;
-		case PROCESS_EXIT: // Process termination
+		case PROC_EVENT_EXIT: // Process termination
 			process_exits++;
 			break;
-		case PROCESS_WORKING_DIR_CHANGE: // Working directory change
-						 // (chdir)
+		case PROC_EVENT_WORKING_DIR: // Working directory change (chdir)
 			working_dir_changes++;
 			break;
-		case PROCESS_ENV_VAR_CHANGE: // Environment variable change
+		case PROC_EVENT_ENV_CHANGE: // Environment variable change
 			env_var_changes++;
 			break;
-		case PROCESS_SIGNAL_HANDLING: // Signal handling (kill, signal)
+		case PROC_EVENT_SIGNAL: // Signal handling (kill, signal)
 			signal_events++;
 			break;
-		case PROCESS_PRIORITY_CHANGE: // Priority change (nice,
-					      // setpriority)
+		case PROC_EVENT_PRIORITY_CHANGE: // Priority change (nice, setpriority)
 			priority_changes++;
 			break;
-		case PROCESS_GROUP_OPERATION: // Process group operations
+		case PROC_EVENT_IPC_OPERATION: // Process group operations
 			process_group_ops++;
 			break;
-		case PROCESS_SESSION_OPERATION: // Session operations
+		case PROC_EVENT_SESSION_CHANGE: // Session operations
 			session_ops++;
 			break;
-		case PROCESS_AFFINITY_CHANGE: // CPU affinity changes
+		case PROC_EVENT_AFFINITY_CHANGE: // CPU affinity changes
 			affinity_changes++;
 			break;
-		case PROCESS_MEMORY_MAP: // Memory mapping operations
+		case PROC_EVENT_EXEC: // Process execution (memory mapping operations)
 			memory_maps++;
 			break;
-		case PROCESS_CREDENTIAL_CHANGE: // Credential changes (setuid,
-						// setgid)
+		case PROC_EVENT_SETUID:
+		case PROC_EVENT_SETGID:
+		case PROC_EVENT_SETRESUID:
+		case PROC_EVENT_SETRESGID:
+		case PROC_EVENT_CAPSET: // Credential changes (setuid, setgid)
 			credential_changes++;
 			break;
 		default:

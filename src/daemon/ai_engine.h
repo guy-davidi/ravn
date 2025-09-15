@@ -39,27 +39,11 @@ struct ravn_event;
  * These enums make the code more readable and maintainable
  */
 
-/**
- * enum process_event_type - Process-related event types
- */
-enum process_event_type {
-	PROCESS_SPAWN = 1,		/* Process creation (execve, fork, clone) */
-	PROCESS_EXIT = 2,		/* Process termination */
-	PROCESS_WORKING_DIR_CHANGE = 3, /* Working directory change (chdir) */
-	PROCESS_ENV_VAR_CHANGE = 4,	/* Environment variable modification */
-	PROCESS_SIGNAL_HANDLING = 5,	/* Signal handling (kill, signal) */
-	PROCESS_PRIORITY_CHANGE = 6,	/* Priority change (nice, setpriority) */
-	PROCESS_GROUP_OPERATION = 7,	/* Process group operations */
-	PROCESS_SESSION_OPERATION = 8,	/* Session operations */
-	PROCESS_AFFINITY_CHANGE = 9,	/* CPU affinity changes */
-	PROCESS_MEMORY_MAP = 10,	/* Memory mapping operations */
-	PROCESS_CREDENTIAL_CHANGE = 11, /* Credential changes (setuid, setgid) */
-	PROCESS_COMMAND_COMPLEXITY = 12 /* Command complexity estimation */
-};
-
 /*
- * Note: file_event_type, network_event_type, and security_event_type
- * are defined in ebpf_handler.h and included above
+ * Note: All event type enums (process_event_type, file_event_type,
+ * network_event_type, security_event_type, memory_event_type,
+ * kernel_event_type, performance_event_type) are defined in
+ * ebpf_handler.h and included above
  */
 
 /*
@@ -198,25 +182,35 @@ enum feature_category {
  * RAVN Security Feature Extraction Parameters
  * Multi-dimensional feature extraction for comprehensive threat detection
  */
-#define TOTAL_FEATURES	    64 /* Total number of extracted features */
-#define TEMPORAL_FEATURES   8  /* Time-based pattern features */
-#define PROCESS_FEATURES    12 /* Process behavior features */
-#define FILE_FEATURES	    10 /* File access pattern features */
-#define NETWORK_FEATURES    8  /* Network behavior features */
-#define SECURITY_FEATURES   8  /* Security event features */
-#define SYSTEM_FEATURES	    8  /* System resource usage features */
-#define BEHAVIORAL_FEATURES 10 /* Behavioral pattern features */
+#define TOTAL_FEATURES                                                             \
+	128 /* Total number of extracted features (doubled for enhanced eBPF data) \
+	     */
+#define TEMPORAL_FEATURES    8	/* Time-based pattern features */
+#define PROCESS_FEATURES     12 /* Process behavior features */
+#define FILE_FEATURES	     10 /* File access pattern features */
+#define NETWORK_FEATURES     8	/* Network behavior features */
+#define SECURITY_FEATURES    8	/* Security event features */
+#define SYSTEM_FEATURES	     8	/* System resource usage features */
+#define BEHAVIORAL_FEATURES  10 /* Behavioral pattern features */
+#define MEMORY_FEATURES	     12 /* Memory behavior features */
+#define KERNEL_FEATURES	     10 /* Kernel-level features */
+#define PERFORMANCE_FEATURES 12 /* Performance metrics features */
+#define ADVANCED_FEATURES    40 /* Advanced pattern detection features */
 
 /*
  * Feature Category Offsets
  */
-#define TEMPORAL_OFFSET	  0  /* Temporal features start at index 0 */
-#define PROCESS_OFFSET	  8  /* Process features start at index 8 */
-#define FILE_OFFSET	  20 /* File features start at index 20 */
-#define NETWORK_OFFSET	  30 /* Network features start at index 30 */
-#define SECURITY_OFFSET	  38 /* Security features start at index 38 */
-#define SYSTEM_OFFSET	  46 /* System features start at index 46 */
-#define BEHAVIORAL_OFFSET 54 /* Behavioral features start at index 54 */
+#define TEMPORAL_OFFSET	   0  /* Temporal features start at index 0 */
+#define PROCESS_OFFSET	   8  /* Process features start at index 8 */
+#define FILE_OFFSET	   20 /* File features start at index 20 */
+#define NETWORK_OFFSET	   30 /* Network features start at index 30 */
+#define SECURITY_OFFSET	   38 /* Security features start at index 38 */
+#define SYSTEM_OFFSET	   46 /* System features start at index 46 */
+#define BEHAVIORAL_OFFSET  54 /* Behavioral features start at index 54 */
+#define MEMORY_OFFSET	   64 /* Memory features start at index 64 */
+#define KERNEL_OFFSET	   76 /* Kernel features start at index 76 */
+#define PERFORMANCE_OFFSET 86 /* Performance features start at index 86 */
+#define ADVANCED_OFFSET	   98 /* Advanced features start at index 98 */
 
 /*
  * Threat Level Thresholds
@@ -591,6 +585,47 @@ void extract_system_features(const struct event_sequence* sequence, float* featu
  * attempts, evasion techniques, and lateral movement patterns.
  */
 void extract_behavioral_features(const struct event_sequence* sequence, float* features);
+
+/**
+ * extract_memory_features - Extract memory behavior features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for memory features (12 features)
+ *
+ * Extracts memory behavior features including allocation patterns, memory
+ * corruption attempts, heap spray detection, and memory access anomalies.
+ */
+void extract_memory_features(const struct event_sequence* sequence, float* features);
+
+/**
+ * extract_kernel_features - Extract kernel-level features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for kernel features (10 features)
+ *
+ * Extracts kernel-level features including module operations, kernel function
+ * calls, security violations, and kernel performance metrics.
+ */
+void extract_kernel_features(const struct event_sequence* sequence, float* features);
+
+/**
+ * extract_performance_features - Extract performance metrics features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for performance features (12 features)
+ *
+ * Extracts performance metrics features including CPU usage, memory pressure,
+ * I/O patterns, and system resource contention.
+ */
+void extract_performance_features(const struct event_sequence* sequence, float* features);
+
+/**
+ * extract_advanced_features - Extract advanced pattern detection features
+ * @sequence: Event sequence to analyze
+ * @features: Output array for advanced features (40 features)
+ *
+ * Extracts advanced pattern detection features including multi-dimensional
+ * correlation analysis, temporal anomaly detection, and complex attack pattern
+ * recognition.
+ */
+void extract_advanced_features(const struct event_sequence* sequence, float* features);
 
 /**
  * normalize_features - Normalize features to [0,1] range

@@ -14,7 +14,9 @@ C_SOURCES = $(SRC_DIR)/main.c $(SRC_DIR)/daemon/ebpf_handler.c $(SRC_DIR)/daemon
            $(SRC_DIR)/daemon/ai_engine.c $(SRC_DIR)/daemon/ravn_rnn_lstm.c $(SRC_DIR)/utils/logger.c
 OBJECTS = $(C_SOURCES:$(SRC_DIR)/%.c=$(ARTIFACTS_DIR)/%.o)
 EBPF_OBJECTS = $(ARTIFACTS_DIR)/syscall_monitor.bpf.o $(ARTIFACTS_DIR)/network_monitor.bpf.o \
-               $(ARTIFACTS_DIR)/security_monitor.bpf.o $(ARTIFACTS_DIR)/file_monitor.bpf.o
+               $(ARTIFACTS_DIR)/security_monitor.bpf.o $(ARTIFACTS_DIR)/file_monitor.bpf.o \
+               $(ARTIFACTS_DIR)/memory_monitor.bpf.o $(ARTIFACTS_DIR)/process_monitor.bpf.o \
+               $(ARTIFACTS_DIR)/kernel_monitor.bpf.o $(ARTIFACTS_DIR)/performance_monitor.bpf.o
 
 all: $(VERSION_HEADER) $(MODEL_HEADER) $(EBPF_OBJECTS) $(RAVN)
 

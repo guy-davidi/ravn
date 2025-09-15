@@ -29,6 +29,7 @@
 #include <bpf/libbpf.h>
 #include <stdint.h>
 #include <time.h>
+#include "../ebpf/ravn_events.h"
 
 /*
  * System Call Number Enums - Comprehensive Linux system call definitions
@@ -297,10 +298,9 @@ enum file_event_type {
 };
 
 /*
- * Event Structures (must match eBPF programs)
- * These structures define the data format for events captured by eBPF programs
- * and processed by user-space handlers.
+ * Note: All event type enums and event structures are defined in ../ebpf/ravn_events.h
  */
+
 
 /**
  * struct syscall_event - System call event structure
@@ -425,13 +425,15 @@ struct file_event {
 	char target_filename[256]; /* Target filename */
 };
 
+
 /**
  * struct ravn_event - Generic event structure for Redis storage
  * @timestamp: Event timestamp in nanoseconds since epoch
  * @pid: Process ID
  * @tid: Thread ID
  * @event_type: Specific event type within category
- * @event_category: Event category (1=syscall, 2=network, 3=security, 4=file)
+ * @event_category: Event category (1=syscall, 2=network, 3=security, 4=file, 5=memory, 6=process,
+ * 7=kernel, 8=performance)
  * @comm: Process command name
  * @data: JSON serialized event data
  *
@@ -534,6 +536,50 @@ int process_security_event(const struct security_event* event);
  */
 int process_file_event(const struct file_event* event);
 
+/**
+ * process_memory_event - Process memory event
+ * @event: Memory event to process
+ *
+ * Processes a memory event, converts it to generic format,
+ * and forwards it to Redis for storage and AI analysis.
+ *
+ * Return: 0 on success, -1 on failure
+ */
+int process_memory_event(const struct memory_event* event);
+
+/**
+ * process_process_event - Process process event
+ * @event: Process event to process
+ *
+ * Processes a process event, converts it to generic format,
+ * and forwards it to Redis for storage and AI analysis.
+ *
+ * Return: 0 on success, -1 on failure
+ */
+int process_process_event(const struct process_event* event);
+
+/**
+ * process_kernel_event - Process kernel event
+ * @event: Kernel event to process
+ *
+ * Processes a kernel event, converts it to generic format,
+ * and forwards it to Redis for storage and AI analysis.
+ *
+ * Return: 0 on success, -1 on failure
+ */
+int process_kernel_event(const struct kernel_event* event);
+
+/**
+ * process_performance_event - Process performance event
+ * @event: Performance event to process
+ *
+ * Processes a performance event, converts it to generic format,
+ * and forwards it to Redis for storage and AI analysis.
+ *
+ * Return: 0 on success, -1 on failure
+ */
+int process_performance_event(const struct performance_event* event);
+
 /*
  * Utility Functions
  */
@@ -577,6 +623,46 @@ const char* get_security_event_name(uint32_t event_type);
  * Return: File event name string, "UNKNOWN" if not found
  */
 const char* get_file_event_name(uint32_t event_type);
+
+/**
+ * get_memory_event_name - Get memory event name from type
+ * @event_type: Memory event type
+ *
+ * Returns the human-readable name for a memory event type.
+ *
+ * Return: Memory event name string, "UNKNOWN" if not found
+ */
+const char* get_memory_event_name(uint32_t event_type);
+
+/**
+ * get_process_event_name - Get process event name from type
+ * @event_type: Process event type
+ *
+ * Returns the human-readable name for a process event type.
+ *
+ * Return: Process event name string, "UNKNOWN" if not found
+ */
+const char* get_process_event_name(uint32_t event_type);
+
+/**
+ * get_kernel_event_name - Get kernel event name from type
+ * @event_type: Kernel event type
+ *
+ * Returns the human-readable name for a kernel event type.
+ *
+ * Return: Kernel event name string, "UNKNOWN" if not found
+ */
+const char* get_kernel_event_name(uint32_t event_type);
+
+/**
+ * get_performance_event_name - Get performance event name from type
+ * @event_type: Performance event type
+ *
+ * Returns the human-readable name for a performance event type.
+ *
+ * Return: Performance event name string, "UNKNOWN" if not found
+ */
+const char* get_performance_event_name(uint32_t event_type);
 
 /**
  * event_to_json - Convert event to JSON string
