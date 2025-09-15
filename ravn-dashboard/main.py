@@ -243,12 +243,18 @@ async def get_system_stats():
     try:
         redis_conn = await get_redis()
         
+        # Debug: Check what keys exist in Redis
+        all_keys = await redis_conn.keys("*")
+        logger.info(f"Redis keys found: {all_keys}")
+        
         # Get event counts
         memory_count = await redis_conn.llen("ravn:events:memory")
         process_count = await redis_conn.llen("ravn:events:process")
         kernel_count = await redis_conn.llen("ravn:events:kernel")
         perf_count = await redis_conn.llen("ravn:events:performance")
         ai_count = await redis_conn.llen("ravn:ai:analyses")
+        
+        logger.info(f"Event counts - Memory: {memory_count}, Process: {process_count}, Kernel: {kernel_count}, Performance: {perf_count}, AI: {ai_count}")
         
         total_events = memory_count + process_count + kernel_count + perf_count
         
