@@ -2,16 +2,16 @@
 #define RAVN_VERSION_H
 
 // Auto-generated version information
-// Generated on: 2025-09-24 07:33:04 UTC
+// Generated on: 2025-09-25 07:32:02 UTC
 
 #define RAVN_VERSION_MAJOR 2025
 #define RAVN_VERSION_MINOR 9
-#define RAVN_VERSION_PATCH 24
+#define RAVN_VERSION_PATCH 25
 #define RAVN_VERSION_MAGIC 3
-#define RAVN_VERSION_STRING "20250924.3"
-#define RAVN_BUILD_DATE "2025-09-24"
-#define RAVN_BUILD_TIME "07:33:04"
-#define RAVN_COMMIT_SHA "851b398"
+#define RAVN_VERSION_STRING "20250925.3"
+#define RAVN_BUILD_DATE "2025-09-25"
+#define RAVN_BUILD_TIME "07:32:02"
+#define RAVN_COMMIT_SHA "de3fb1d"
 
 // Version format: YYYYMMDD.MAGIC
 // - YYYYMMDD: Date when version was created
