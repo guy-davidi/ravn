@@ -114,3 +114,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **RAVN** - Where cutting-edge technology meets security innovation.
 
 *Powered by eBPF, AI, and next-gen kernel technology.*
+
+/* New */
